@@ -1,1 +1,1 @@
-# QuizIT
+# HSE Lyceum IT Projects - QuizIT
