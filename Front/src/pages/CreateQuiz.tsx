@@ -462,7 +462,7 @@ const CreateQuiz = () => {
                     </Button>
                 </div>
                 <div className='flex-1 relative overflow-hidden rounded-lg border-2 border-gray-300'>
-                    <div className='absolute inset-0 bg-[url("/src/assets/bg.png")] bg-cover bg-center bg-no-repeat opacity-30' style={{ filter: 'brightness(0.5)' }}></div>
+                    <div className='absolute inset-0 bg-[url("bg.png")] bg-cover bg-center bg-no-repeat opacity-30' style={{ filter: 'brightness(0.5)' }}></div>
                     <div className='relative z-10 p-4 text-white'>
                         <div className="flex justify-center items-center h-40">
                             <Input 
@@ -486,7 +486,7 @@ const CreateQuiz = () => {
                                 }}
                             >
                                 <div className='flex items-center justify-center bg-[#540D6E] rounded-lg px-2 py-4'>
-                                    <img src="/src/assets/star.svg" alt="img" className='w-8 h-8'/>
+                                    <img src="star.svg" alt="img" className='w-8 h-8'/>
                                 </div>
                                 <input
                                     className='w-full bg-transparent border-none placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none ml-2'
@@ -519,7 +519,7 @@ const CreateQuiz = () => {
                                 }}
                             >
                                 <div className='flex items-center justify-center bg-[#EE4266] rounded-lg px-2 py-4'>
-                                    <img src="/src/assets/sq.svg" alt="img" className='w-8 h-8'/>
+                                    <img src="sq.svg" alt="img" className='w-8 h-8'/>
                                 </div>
                                 <input
                                     className='w-full bg-transparent border-none placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none ml-2'
@@ -552,7 +552,7 @@ const CreateQuiz = () => {
                                 }}
                             >
                                 <div className='flex items-center justify-center bg-[#FFD23F] rounded-lg px-2 py-4'>
-                                    <img src="/src/assets/trig.svg" alt="img" className='w-8 h-8'/>
+                                    <img src="trig.svg" alt="img" className='w-8 h-8'/>
                                 </div>
                                 <input
                                     className='w-full bg-transparent border-none placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none ml-2'
@@ -585,7 +585,7 @@ const CreateQuiz = () => {
                                 }}
                             >
                                 <div className='flex items-center justify-center bg-[#3BCEAC] rounded-lg px-2 py-4'>
-                                    <img src="/src/assets/circ.svg" alt="img" className='w-8 h-8'/>
+                                    <img src="circ.svg" alt="img" className='w-8 h-8'/>
                                 </div>
                                 <input
                                     className='w-full bg-transparent border-none placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none ml-2'
