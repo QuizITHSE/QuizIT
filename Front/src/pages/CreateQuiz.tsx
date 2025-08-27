@@ -1,10 +1,10 @@
-import { addDoc, collection, query, where, getDocs, updateDoc, arrayUnion, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { addDoc, collection, updateDoc, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { Spinner } from '@/components/ui/spinner';
-import { GraduationCap, ArrowRight, Check,  BookMarked, Circle, GripVertical, Trash2 } from 'lucide-react'
+//import { Spinner } from '@/components/ui/spinner';
+import { GraduationCap, Check,  Circle, Trash2 } from 'lucide-react'
 import { produce } from "immer";
 import { auth, db } from '@/lib/firebase';
 import {

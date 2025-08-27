@@ -21,7 +21,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { addDoc, collection } from "firebase/firestore";
 import { db, app } from '@/lib/firebase';
 
-// Импортируем react-hook-form и shadcn/ui
 import { useForm } from "react-hook-form"
 import {
   Form,
