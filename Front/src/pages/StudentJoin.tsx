@@ -1,4 +1,4 @@
-import { addDoc, collection, query, where, getDocs, updateDoc, arrayUnion, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link, useNavigate } from 'react-router-dom';
