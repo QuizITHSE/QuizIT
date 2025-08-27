@@ -462,7 +462,7 @@ const CreateQuiz = () => {
                     </Button>
                 </div>
                 <div className='flex-1 relative overflow-hidden rounded-lg border-2 border-gray-300'>
-                    <div className='absolute inset-0 bg-[url("/public/bg.wepb")] bg-cover bg-center bg-no-repeat opacity-30' style={{ filter: 'brightness(0.5)' }}></div>
+                    <div className='absolute inset-0 bg-[url("bg.webp")] bg-cover bg-center bg-no-repeat opacity-30' style={{ filter: 'brightness(0.5)' }}></div>
                     <div className='relative z-10 p-4 text-white'>
                         <div className="flex justify-center items-center h-40">
                             <Input 
