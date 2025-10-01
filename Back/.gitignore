@@ -1,0 +1,124 @@
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging / build
+build/
+dist/
+.eggs/
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+python_env/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+pytestdebug.log
+coverage.xml
+nosetests.xml
+.junit/
+
+# Type checkers / linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+.profile
+.DS_Store
+
+# Logs
+*.log
+logs/
+tmp/
+temp/
+
+# Editor / IDE
+.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# -----------------------------
+# Firebase / Google Cloud
+# -----------------------------
+# Service account keys (NEVER COMMIT THESE)
+firebase-adminsdk-*.json
+serviceAccount*.json
+service-account*.json
+firebase-key.json
+credentials.json
+gcloud-key.json
+*.secret.json
+*.key.json
+*.credentials.json
+quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json
+
+# Common env/config files that may contain secrets
+.env
+.env.*
+!.env.example        # keep a template committed
+*.envrc
+.envrc
+
+# Firebase local emulator and config artifacts
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# If using the Firebase Emulator Suite data
+# (uncomment if you store local data in the repo folder)
+# firestore_export/
+# emulator-data/
+
+# -----------------------------
+# Cache and framework-specific
+# -----------------------------
+# Django/Flask/etc. temp files if applicable
+instance/
+*.sqlite3
+*.db
+
+# Poetry / Pipenv
+.poetry/
+poetry.lock
+Pipfile.lock
+
+# Node (if you have Firebase tools or functions with Node)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
