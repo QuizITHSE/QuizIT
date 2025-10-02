@@ -116,10 +116,7 @@ async def next_round(lobby, cur_round, player):
 
 
 
-LOBBIES = []
-USERS = {
 
-}
 
 class User:
     def __init__(self, ws_id, user_id, user_info):
@@ -131,22 +128,87 @@ class User:
 
 
 class Lobby:
-    def __init__(self, host, quiz, game_id):
+    def __init__(self, host, quiz, game_id, code):
         self.host = host
         self.quiz = quiz
         self.game_id = game_id
+        self.players_ids = []
         self.players = []
+        self.score_board = {}
+        self.code = code
+        self.started = False
+        self.currently_round = False
+        self.current_question = -1
+        self.answers = []
 
 
-    def connect(self, user: User):
+
+    def __eq__(self, other):
+        return self.code
+
+    async def connect(self, user: User):
+        self.players_ids.append(user.user_id)
+        self.players.append(user)
+        self.score_board[user.user_id] = [user.username, 0]
         db.collection("games").document(self.game_id).update({
-            "players": firestore.ArrayUnion(user.user_id)
+            "players": firestore.ArrayUnion(self.players_ids)
         })
+        await self.host.ws_id.send(json.dumps({"players": [el.username for el in self.players]}))
 
     async def broadcast(self, message):
         for el in self.players:
             await el.ws_id.send(message)
 
+    async def start_game(self):
+        self.currently_round = True
+        self.started = True
+        self.current_question += 1
+        question_obj = self.quiz["questions"][self.current_question]
+        del question_obj["correct"]
+        await self.host.ws_id.send(json.dumps(question_obj))
+        await self.broadcast(json.dumps(question_obj))
+        asyncio.create_task(on_question_timer_end(self.current_question, self, self.quiz["questions"][self.current_question]))
+
+    async def save_answer(self, user: User, answer):
+        self.answers.append({"user": user, "answer": answer})
+        await self.host.send(json.dumps(json.dumps({"answers": len(self.answers)})))
+        await user.ws_id.send("Saved! Waiting for end of round....")
+        #TODO: remove the +1 only for testing
+        if len(self.answers) == len(self.players) + 30:
+            self.current_question += 1
+            self.currently_round = False
+            #TODO: next round handling
+
+
+    async def serve_next(self):
+        self.current_question += 1
+        self.currently_round = False
+
+
+async def on_question_timer_end(dispatch_round_number, lobby: Lobby, question):
+    #TODO: remove only for debug
+    #await asyncio.sleep(question["timeLimit"])
+    await asyncio.sleep(30)
+    lobby.currently_round = False
+    info_for_host = {"right": 0, "wrong": 0, "by_answer": {}}
+    for i in range(len(lobby.quiz["questions"][lobby.current_question]["options"])):
+        info_for_host["by_answer"][i] = 0
+    if lobby.current_question == dispatch_round_number:
+        for answer_info in lobby.answers:
+            info_for_host["by_answer"][answer_info["answer"]] += 1
+            if answer_info["answer"] == lobby.quiz[lobby.current_question]["answer"]:
+                await answer_info["user"].send(json.dumps({"correct": True}))
+                info_for_host["right"] += 1
+                #TODO: update score
+            else:
+                await answer_info["user"].send(json.dumps({"correct": False}))
+    await lobby.host.ws_id.send(json.dumps(info_for_host))
+
+
+
+
+LOBBIES = []
+USERS = {}
 
 def create_game(user: User, group_id):
     game_code = generate_unique_game_code(6)
@@ -158,7 +220,7 @@ def create_game(user: User, group_id):
         "code": game_code
     })
     if write_result:
-        return doc_ref.id
+        return game_code, doc_ref.id
 
 
 def fetch_quiz(quiz_id):
@@ -197,14 +259,29 @@ async def main_handler(websocket):
 
             if user_obj["user"].teacher and message.get("quiz") and not user_obj["lobby"]:
                 await websocket.send("creating...")
-                game = create_game(user_obj["user"], message.get("group"))
+                code, game_id = create_game(user_obj["user"], message.get("group"))
                 quiz = fetch_quiz(message.get("quiz"))
-                user_obj["lobby"] = Lobby(user_obj["user"], quiz, game)
-                await websocket.send(f"done! room code: {game}")
+                user_obj["lobby"] = Lobby(user_obj["user"], quiz, game_id, code)
+                LOBBIES.append(user_obj["lobby"])
+                await websocket.send(f"done! room code: {code}")
                 await websocket.send(f"quiz questions: {quiz["questions"]}")
+                print(LOBBIES)
+                print(USERS)
+            if message.get("code") and not user_obj["lobby"]:
+                await websocket.send("joining...")
+                lobby_index = LOBBIES.index(message.get("code"))
+                await LOBBIES[lobby_index].connect(user_obj["user"])
+                user_obj["lobby"] = LOBBIES[lobby_index]
+                await websocket.send("Joined! Waiting for start")
+                print(LOBBIES[lobby_index].quiz["title"])
 
+            if message.get("start") and user_obj["lobby"].host == user_obj["user"]:
+                await user_obj["lobby"].start_game()
 
+            print(message, user_obj)
 
+            if message.get("answer") and user_obj["lobby"]:
+                await user_obj["lobby"].save_answer(user_obj["user"], message.get("answer"))
 
 
 
