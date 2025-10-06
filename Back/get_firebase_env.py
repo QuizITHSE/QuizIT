@@ -11,7 +11,7 @@ def get_firebase_env_var():
     """Читает Firebase ключ и возвращает строку для переменной окружения"""
     
     # Путь к Firebase ключу
-    firebase_key_path = "Back/quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
+    firebase_key_path = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
     
     if not os.path.exists(firebase_key_path):
         print(f"❌ Файл {firebase_key_path} не найден!")

@@ -7,13 +7,17 @@ import Auth from './pages/Auth.tsx'
 import CreateGroup from './pages/CreateGroup.tsx'
 import StudentJoin from './pages/StudentJoin.tsx'
 import CreateQuiz from './pages/CreateQuiz.tsx'
+import HostQuiz from './pages/HostQuiz.tsx'
+import PlayQuiz from './pages/PlayQuiz.tsx'
 
 const router = createBrowserRouter([
   { path: '/', element: <App/>},
   { path: '/auth', element: <Auth/>},  
   { path: '/create-group', element: <CreateGroup/>},
   { path: '/student-join', element: <StudentJoin/>},
-  { path: '/create-quiz', element: <CreateQuiz/>}
+  { path: '/create-quiz', element: <CreateQuiz/>},
+  { path: '/host', element: <HostQuiz/>},
+  { path: '/play', element: <PlayQuiz/>}
 ])
 
 

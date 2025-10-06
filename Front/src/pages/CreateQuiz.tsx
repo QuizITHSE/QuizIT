@@ -118,6 +118,7 @@ const CreateQuiz = () => {
     ])
 
     const [quizDocId, setQuizDocId] = useState("")
+    const [quizTitle, setQuizTitle] = useState("")
     
     const [savingText, setSavingText] = useState("Сохранить")
 
@@ -140,6 +141,9 @@ const CreateQuiz = () => {
                     if (quizDoc.exists()) {
                         const quizData = quizDoc.data();
                         console.log('Fetched quiz:', quizData);
+                        
+                        // Загружаем название квиза
+                        setQuizTitle(quizData.title || "");
                         
                         // Если есть вопросы, загружаем их из коллекции "questions"
                         if (quizData.questions && quizData.questions.length > 0) {
@@ -258,6 +262,7 @@ const CreateQuiz = () => {
             // Обновляем документ викторины с массивом id вопросов
             if (quizDocId) {
                 await updateDoc(doc(db, "quizes", quizDocId), {
+                    title: quizTitle,
                     questions: questionIds,
                     updatedAt: new Date(),
                 });
@@ -418,9 +423,17 @@ const CreateQuiz = () => {
             <div className='w-full flex flex-row items-center drop-shadow-2xl border-2 border-gray-300 rounded-lg p-3 mb-4'>
                 <h1 className='text-2xl mr-2'>QuizIT</h1>
                 <GraduationCap width={30} height={30} className='mr-5'/>
-                <Input placeholder='Введи название викторины..' className='w-120 border-2'/>
+                <Input 
+                    placeholder='Введи название викторины..' 
+                    className='w-120 border-2'
+                    value={quizTitle}
+                    onChange={(e) => setQuizTitle(e.target.value)}
+                />
                 <div className='ml-auto'>
-                    <Button className='mr-2 drop-shadow-lg cursor-pointer'>
+                    <Button 
+                        className='mr-2 drop-shadow-lg cursor-pointer'
+                        onClick={() => navigate('/')}
+                    >
                         Выйти
                     </Button>
                     <Button onClick={saveQuiz} className='bg-[#EE4266] hover:bg-[#c51d45] drop-shadow-lg cursor-pointer'>
