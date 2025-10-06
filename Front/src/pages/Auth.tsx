@@ -97,6 +97,10 @@ function Auth() {
                 loginForm.setError("password", { message: "Неверный пароль" });
             } else if (error.code === "auth/invalid-email") {
                 loginForm.setError("email", { message: "Некорректный формат почты" });
+            } else if (error.code === "auth/invalid-credential") {
+                loginForm.setError("root", { message: "Неверный email или пароль. Проверьте правильность введенных данных." });
+            } else if (error.code === "auth/too-many-requests") {
+                loginForm.setError("root", { message: "Слишком много попыток входа. Попробуйте позже." });
             } else {
                 loginForm.setError("root", { message: "Ошибка входа: " + (error.message || "Неизвестная ошибка") });
             }
@@ -144,6 +148,8 @@ function Auth() {
                 setRegError("Некорректный формат почты");
             } else if (error.code === "auth/weak-password") {
                 setRegError("Слабый пароль. Минимум 6 символов.");
+            } else if (error.code === "auth/too-many-requests") {
+                setRegError("Слишком много попыток регистрации. Попробуйте позже.");
             } else {
                 setRegError("Ошибка регистрации: " + (error.message || "Неизвестная ошибка"));
             }

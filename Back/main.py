@@ -197,10 +197,7 @@ class Lobby:
             is_correct = answer == self.quiz["questions"][self.current_question]["correct"]
             if is_correct:
                 info_for_host["right"] += 1
-                await answer_info["user"].ws_id.send(json.dumps({"correct": True}))
-            else:
-                await answer_info["user"].ws_id.send(json.dumps({"correct": False}))
-        
+
         # Calculate wrong answers
         info_for_host["wrong"] = len(self.answers) - info_for_host["right"]
         
@@ -212,6 +209,18 @@ class Lobby:
         
         # Send results to host
         await self.host.ws_id.send(json.dumps({"type": "round_results", "data": info_for_host}))
+        
+        # Send round results with answer correctness and scoreboard to all players
+        for answer_info in self.answers:
+            answer = answer_info["answer"]
+            is_correct = answer == self.quiz["questions"][self.current_question]["correct"]
+            
+            await answer_info["user"].ws_id.send(json.dumps({
+                "type": "round_ended",
+                "correct": is_correct,
+                "scoreboard": self.score_board,
+                "question_points": question_points
+            }))
         
         # Clear answers for next question
         self.answers = []
@@ -306,6 +315,75 @@ async def on_question_timer_end(dispatch_round_number, lobby: Lobby, question):
 LOBBIES = []
 USERS = {}
 
+async def cleanup_user(websocket):
+    """Clean up user data when WebSocket connection is closed"""
+    if websocket in USERS:
+        user_obj = USERS[websocket]
+        user = user_obj.get("user")
+        lobby = user_obj.get("lobby")
+        
+        if user and lobby:
+            # Check if this is the host disconnecting
+            is_host = lobby.host == user
+            
+            # Remove user from lobby
+            if user in lobby.players:
+                lobby.players.remove(user)
+                if user.user_id in lobby.players_ids:
+                    lobby.players_ids.remove(user.user_id)
+                if user.user_id in lobby.score_board:
+                    del lobby.score_board[user.user_id]
+            
+            # Handle host disconnection
+            if is_host:
+                # If host disconnects, end the game for all players
+                if lobby.players:
+                    await lobby.broadcast(json.dumps({
+                        "type": "host_disconnected", 
+                        "message": "Host has left the game. The game is ending.",
+                        "username": user.username
+                    }))
+                
+                # Mark game as inactive in Firebase
+                try:
+                    db.collection("games").document(lobby.game_id).update({
+                        "active": False,
+                        "ended_reason": "host_disconnected"
+                    })
+                    print(f"Marked game {lobby.game_id} as inactive due to host disconnection")
+                except Exception as e:
+                    print(f"Error updating Firebase: {e}")
+                
+                # Remove lobby from LOBBIES
+                if lobby in LOBBIES:
+                    LOBBIES.remove(lobby)
+                    print(f"Removed lobby due to host disconnection: {lobby.code}")
+            else:
+                # Regular player disconnection
+                if lobby.players:  # If there are still players left
+                    await lobby.broadcast(json.dumps({
+                        "type": "player_disconnected", 
+                        "message": f"{user.username} has left the game",
+                        "username": user.username
+                    }))
+                    
+                    # Update players list for host
+                    if lobby.host and lobby.host.ws_id:
+                        await lobby.host.ws_id.send(json.dumps({
+                            "type": "players_updated",
+                            "players": [player.username for player in lobby.players]
+                        }))
+                
+                # If lobby is empty, remove it
+                if not lobby.players:
+                    if lobby in LOBBIES:
+                        LOBBIES.remove(lobby)
+                        print(f"Removed empty lobby: {lobby.code}")
+        
+        # Remove user from USERS
+        del USERS[websocket]
+        print(f"Cleaned up user data for: {websocket.remote_address}")
+
 def create_game(user: User, group_id):
     game_code = generate_unique_game_code(6)
     write_result, doc_ref = db.collection("games").add({
@@ -390,9 +468,11 @@ async def main_handler(websocket):
 
 
 
-    except websockets.exceptions.ConnectionClosed:
+    except (websockets.exceptions.ConnectionClosed, websockets.exceptions.WebSocketException, Exception) as e:
         # Log when the client disconnects
-        print(f"Connection closed: {websocket.remote_address}")
+        print(f"Connection closed: {websocket.remote_address}, reason: {e}")
+        # Clean up user data
+        await cleanup_user(websocket)
 
 
 async def main():
