@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  quizit-backend:
+    build: .
+    ports:
+      - "8765:8765"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8765
+      # Option 1: Firebase credentials as JSON string (recommended for production)
+      # - FIREBASE_CREDENTIALS_JSON={"type":"service_account","project_id":"your-project",...}
+      
+      # Option 2: Path to Firebase key file (for development)
+      # - FIREBASE_KEY_PATH=/app/firebase-key.json
+    volumes:
+      # Uncomment if using FIREBASE_KEY_PATH
+      # - ./quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json:/app/firebase-key.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import asyncio; import websockets; print('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
