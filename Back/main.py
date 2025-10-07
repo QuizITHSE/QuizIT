@@ -102,6 +102,7 @@ class Lobby:
         self.currently_round = False
         self.current_question = -1
         self.answers = []
+        self.results = {}  # Store final results for each student
 
 
 
@@ -260,6 +261,18 @@ class Lobby:
                 "user_id": user_id
             })
         
+        # Populate results object for each student with their score info
+        for user_id, [username, score] in self.score_board.items():
+            placement = next((p["place"] for p in leaderboard if p["user_id"] == user_id), len(leaderboard))
+            self.results[user_id] = {
+                "user_id": user_id,
+                "username": username,
+                "score": score,
+                "placement": placement,
+                "total_questions": len(self.quiz["questions"]),
+                "total_players": len(leaderboard)
+            }
+        
         # Send individual placement to each player
         for player in self.players:
             player_placement = next((p for p in leaderboard if p["user_id"] == player.user_id), None)
@@ -279,14 +292,21 @@ class Lobby:
             "total_players": len(leaderboard)
         }))
         
-        # Mark game as inactive in Firebase
+        # Mark game as inactive and finished in Firebase
         try:
             db.collection("games").document(self.game_id).update({
                 "active": False,
+                "game_finished": True,
                 "finished_at": firestore.SERVER_TIMESTAMP,
                 "final_results": leaderboard
             })
-            print(f"Game {self.game_id} marked as inactive in Firebase")
+            
+            # Save individual student results to subcollection
+            for user_id, result_data in self.results.items():
+                db.collection("games").document(self.game_id).collection("results").document(user_id).set(result_data)
+            
+            print(f"Game {self.game_id} marked as inactive and finished in Firebase")
+            print(f"Student results saved to /games/{self.game_id}/results/")
         except Exception as e:
             print(f"Error updating Firebase: {e}")
 
@@ -391,6 +411,7 @@ def create_game(user: User, group_id):
         "players": [], 
         "group_id": group_id, 
         "active": True, 
+        "game_finished": False,
         "code": game_code
     })
     if write_result:
@@ -444,11 +465,21 @@ async def main_handler(websocket):
 
             if "code" in message and not user_obj["lobby"]:
                 await websocket.send(json.dumps({"type": "joining", "message": "joining..."}))
-                lobby_index = LOBBIES.index(message.get("code"))
-                await LOBBIES[lobby_index].connect(user_obj["user"])
-                user_obj["lobby"] = LOBBIES[lobby_index]
-                await websocket.send(json.dumps({"type": "joined", "message": "Joined! Waiting for start"}))
-                print(LOBBIES[lobby_index].quiz["title"])
+                
+                # Find lobby by code
+                target_lobby = None
+                for lobby in LOBBIES:
+                    if lobby.code == message.get("code"):
+                        target_lobby = lobby
+                        break
+                
+                if target_lobby:
+                    await target_lobby.connect(user_obj["user"])
+                    user_obj["lobby"] = target_lobby
+                    await websocket.send(json.dumps({"type": "joined", "message": "Joined! Waiting for start"}))
+                    print(target_lobby.quiz["title"])
+                else:
+                    await websocket.send(json.dumps({"type": "error", "message": "Invalid room code!"}))
 
             if "start" in message and user_obj["lobby"].host == user_obj["user"]:
                 await user_obj["lobby"].start_game()
