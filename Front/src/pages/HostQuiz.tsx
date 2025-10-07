@@ -209,15 +209,61 @@ const HostQuiz: React.FC = () => {
     };
   }, []);
 
-  // Send auth message when connected
+  // Send auth message when connected and user is authenticated
   useEffect(() => {
-    if (wsConnected && ws && !authSent) {
-      console.log('🔐 Отправляем сообщение аутентификации...');
-      const authMessage = { user_id: "oT7IGQCDBYpyv2KiDV4n" };
-      console.log('📤 Отправляем AUTH:', authMessage);
-      ws.send(JSON.stringify(authMessage));
-      setAuthSent(true);
-    }
+    const sendAuthMessage = async () => {
+      if (wsConnected && ws && !authSent) {
+        console.log('🔐 Проверяем аутентификацию пользователя...');
+        
+        // Wait for auth state to be ready
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            console.log('✅ Пользователь аутентифицирован, ищем document ID...');
+            
+            try {
+              // Find the user document ID from the users collection
+              const { collection: firestoreCollection, query: firestoreQuery, where: firestoreWhere, getDocs: firestoreGetDocs } = await import('firebase/firestore');
+              const userQuery = firestoreQuery(
+                firestoreCollection(db, 'users'), 
+                firestoreWhere('userId', '==', user.uid)
+              );
+              
+              const userSnapshot = await firestoreGetDocs(userQuery);
+              console.log('📊 User query results:', {
+                empty: userSnapshot.empty,
+                size: userSnapshot.size,
+                docs: userSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
+              });
+              
+              if (userSnapshot.empty) {
+                console.error('❌ User document not found for UID:', user.uid);
+                unsubscribe();
+                return;
+              }
+              
+              const userDocId = userSnapshot.docs[0].id;
+              console.log('✅ Found user document ID:', userDocId);
+              
+              // Send auth message with the document ID
+              const authMessage = { user_id: userDocId };
+              console.log('📤 Отправляем AUTH:', authMessage);
+              ws.send(JSON.stringify(authMessage));
+              setAuthSent(true);
+              unsubscribe(); // Clean up the listener
+              
+            } catch (error) {
+              console.error('❌ Ошибка при поиске user document:', error);
+              unsubscribe();
+            }
+          } else {
+            console.error('❌ Пользователь не аутентифицирован');
+            unsubscribe(); // Clean up the listener
+          }
+        });
+      }
+    };
+
+    sendAuthMessage();
   }, [wsConnected, ws, authSent]);
 
   // Send create quiz message when quiz is loaded AND auth is successful

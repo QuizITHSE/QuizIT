@@ -7,6 +7,7 @@ import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { auth, db } from '@/lib/firebase';
 import QuizList from '@/components/QuizList';
+import QuizResults from '@/components/QuizResults';
 
 function App() {
   const navigate = useNavigate();
@@ -95,7 +96,12 @@ function App() {
           </div>
         </div>
         
-        {isTeacher && <QuizList />}
+        {isTeacher && (
+          <div className="space-y-8">
+            <QuizList />
+            <QuizResults />
+          </div>
+        )}
       </div>
     </div>
   )
