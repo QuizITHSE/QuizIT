@@ -13,9 +13,10 @@ interface QuizContentProps {
   questionData: QuestionData;
   timeLeft: number;
   onSubmitAnswer: (answer: number[]) => void;
+  isHost?: boolean;
 }
 
-const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSubmitAnswer }) => {
+const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSubmitAnswer, isHost = false }) => {
   const { question, type, options, points } = questionData;
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
 
@@ -59,7 +60,7 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
       {/* Question Content */}
       <div className="bg-white p-8 rounded-b-lg shadow-lg">
         <h3 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-          Выберите правильный ответ
+          {isHost ? question : 'Выберите правильный ответ'}
         </h3>
 
         {/* Options */}
@@ -67,16 +68,21 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
           {options.map((option, index) => (
             <button
               key={index}
-              onClick={() => handleAnswerSelect(index)}
-              className={`border-2 rounded-lg p-6 transition-all duration-200 cursor-pointer ${
-                selectedAnswers.includes(index)
-                  ? 'border-blue-600 bg-blue-100 shadow-lg transform scale-105'
-                  : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50'
+              onClick={() => !isHost && handleAnswerSelect(index)}
+              disabled={isHost}
+              className={`border-2 rounded-lg p-6 transition-all duration-200 ${
+                isHost 
+                  ? 'border-gray-300 bg-gray-100 cursor-default'
+                  : selectedAnswers.includes(index)
+                  ? 'border-blue-600 bg-blue-100 shadow-lg transform scale-105 cursor-pointer'
+                  : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
               }`}
             >
               <div className="flex flex-col items-center">
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl mb-2 ${
-                  selectedAnswers.includes(index)
+                  isHost
+                    ? 'bg-gray-400 text-white'
+                    : selectedAnswers.includes(index)
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-300 text-gray-700'
                 }`}>
@@ -88,23 +94,25 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
           ))}
         </div>
 
-        {/* Submit Button */}
-        <div className="text-center">
-          <button
-            onClick={handleSubmit}
-            disabled={selectedAnswers.length === 0}
-            className={`px-8 py-3 rounded-lg font-bold text-lg transition-all duration-200 ${
-              selectedAnswers.length > 0
-                ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {selectedAnswers.length > 0 
-              ? `Отправить ответ${selectedAnswers.length > 1 ? 'ы' : ''} (${selectedAnswers.map(i => i + 1).join(', ')})`
-              : 'Выберите ответ'
-            }
-          </button>
-        </div>
+        {/* Submit Button - Only show for students */}
+        {!isHost && (
+          <div className="text-center">
+            <button
+              onClick={handleSubmit}
+              disabled={selectedAnswers.length === 0}
+              className={`px-8 py-3 rounded-lg font-bold text-lg transition-all duration-200 ${
+                selectedAnswers.length > 0
+                  ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl cursor-pointer'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {selectedAnswers.length > 0 
+                ? `Отправить ответ${selectedAnswers.length > 1 ? 'ы' : ''} (${selectedAnswers.map(i => i + 1).join(', ')})`
+                : 'Выберите ответ'
+              }
+            </button>
+          </div>
+        )}
 
         {/* Timer Bar */}
         <div className="mt-8">

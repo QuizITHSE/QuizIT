@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getDoc, doc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, Users, Clock, Play, ArrowRight } from 'lucide-react';
 import QuizContent from '@/components/QuizContent';
@@ -36,12 +37,15 @@ const PlayQuiz: React.FC = () => {
     correct: boolean;
     placement?: number;
     questionPoints: number;
+    missed?: boolean;
+    message?: string;
   } | null>(null);
   const [gameFinished, setGameFinished] = useState<{
     placement: number;
     score: number;
     totalPlayers: number;
   } | null>(null);
+  const [userUid, setUserUid] = useState<string | null>(null);
 
   const gameCodeParam = searchParams.get('code');
 
@@ -117,7 +121,9 @@ const PlayQuiz: React.FC = () => {
             setRoundResult({
               correct: message.correct,
               placement,
-              questionPoints: message.question_points
+              questionPoints: message.question_points,
+              missed: message.missed || false,
+              message: message.message
             });
             setCurrentQuestion(null);
             setTimerActive(false);
@@ -168,14 +174,14 @@ const PlayQuiz: React.FC = () => {
 
   // Send auth message when connected
   useEffect(() => {
-    if (wsConnected && ws && !authSent) {
+    if (wsConnected && ws && !authSent && userUid) {
       console.log('🔐 Отправляем сообщение аутентификации...');
-      const authMessage = { user_id: "oT7IGQCDBYpyv2KiDV4n" };
+      const authMessage = { user_id: userUid };
       console.log('📤 Отправляем AUTH:', authMessage);
       ws.send(JSON.stringify(authMessage));
       setAuthSent(true);
     }
-  }, [wsConnected, ws, authSent]);
+  }, [wsConnected, ws, authSent, userUid]);
 
   // Join game when auth is successful and game code is provided
   useEffect(() => {
@@ -215,17 +221,14 @@ const PlayQuiz: React.FC = () => {
 
       // Check if user is student (not teacher)
       try {
-        const { collection: firestoreCollection, query: firestoreQuery, where: firestoreWhere, getDocs: firestoreGetDocs } = await import('firebase/firestore');
-        const { db } = await import('@/lib/firebase');
-        const q = firestoreQuery(firestoreCollection(db, 'users'), firestoreWhere('userId', '==', user.uid));
-        const querySnapshot = await firestoreGetDocs(q);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
         
-        if (querySnapshot.empty) {
+        if (!userDoc.exists()) {
           navigate('/auth');
           return;
         }
         
-        const userData = querySnapshot.docs[0].data();
+        const userData = userDoc.data();
         
         if (userData.isTeacher) {
           alert('Учителя не могут участвовать в квизах как студенты.');
@@ -235,6 +238,7 @@ const PlayQuiz: React.FC = () => {
         
         setIsStudent(true);
         setPlayerName(user.displayName || user.email || 'Студент');
+        setUserUid(user.uid); // Сохраняем UID пользователя
       } catch (error) {
         console.error('Ошибка при проверке роли пользователя:', error);
         navigate('/auth');
@@ -478,15 +482,23 @@ const PlayQuiz: React.FC = () => {
           ) : roundResult ? (
             /* Round Result Display */
             <div className={`p-8 rounded-lg ${
-              roundResult.correct 
+              roundResult.missed 
+                ? 'bg-yellow-100 border-2 border-yellow-500'
+                : roundResult.correct 
                 ? 'bg-green-100 border-2 border-green-500' 
                 : 'bg-red-100 border-2 border-red-500'
             }`}>
               <div className="flex flex-col items-center">
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-                  roundResult.correct ? 'bg-green-500' : 'bg-red-500'
+                  roundResult.missed 
+                    ? 'bg-yellow-500'
+                    : roundResult.correct ? 'bg-green-500' : 'bg-red-500'
                 }`}>
-                  {roundResult.correct ? (
+                  {roundResult.missed ? (
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : roundResult.correct ? (
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
@@ -498,21 +510,37 @@ const PlayQuiz: React.FC = () => {
                 </div>
                 
                 <h2 className={`text-2xl font-bold mb-2 ${
-                  roundResult.correct ? 'text-green-800' : 'text-red-800'
+                  roundResult.missed 
+                    ? 'text-yellow-800'
+                    : roundResult.correct ? 'text-green-800' : 'text-red-800'
                 }`}>
-                  {roundResult.correct ? 'Правильно!' : 'Неправильно!'}
+                  {roundResult.missed ? 'Время вышло!' : roundResult.correct ? 'Правильно!' : 'Неправильно!'}
                 </h2>
+                
+                {roundResult.message && (
+                  <p className={`text-lg mb-4 ${
+                    roundResult.missed 
+                      ? 'text-yellow-700'
+                      : roundResult.correct ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {roundResult.message}
+                  </p>
+                )}
                 
                 {roundResult.placement && (
                   <p className={`text-lg font-semibold mb-2 ${
-                    roundResult.correct ? 'text-green-700' : 'text-red-700'
+                    roundResult.missed 
+                      ? 'text-yellow-700'
+                      : roundResult.correct ? 'text-green-700' : 'text-red-700'
                   }`}>
                     Ваше место: #{roundResult.placement}
                   </p>
                 )}
                 
                 <p className={`text-sm mb-4 ${
-                  roundResult.correct ? 'text-green-600' : 'text-red-600'
+                  roundResult.missed 
+                    ? 'text-yellow-600'
+                    : roundResult.correct ? 'text-green-600' : 'text-red-600'
                 }`}>
                   Баллы за вопрос: {roundResult.questionPoints}
                 </p>

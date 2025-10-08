@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { CopyButton } from '@/components/CopyButton';
 import {QRCodeSVG} from 'qrcode.react';
-import { addDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { addDoc, collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from "motion/react";
 import { auth, db } from '@/lib/firebase';
@@ -47,10 +47,21 @@ function CreateGroup() {
     const createGroup = async () => {
         if(groupName.length > 0){
             try {
+                // Получаем данные пользователя напрямую по UID
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                
+                if (!userDoc.exists()) {
+                  console.error('❌ CreateGroup: Пользователь не найден');
+                  alert('Ошибка: данные пользователя не найдены');
+                  return;
+                }
+                
+                console.log('✅ CreateGroup: Данные пользователя получены');
+                
                 const code = await generateUniqueGroupCode(db);
                 setGroupCode(code);
                 const docRef = await addDoc(collection(db, "groups"), {
-                  admin: user?.uid,
+                  admin: user.uid,  // Используем UID напрямую
                   name: groupName,
                   description: groupDescription,
                   createdAt: new Date(),
@@ -63,6 +74,7 @@ function CreateGroup() {
                 setStep(2);
               } catch (e) {
                 console.error("Error adding document: ", e);
+                alert('Ошибка при создании группы: ' + (e as Error).message);
               } 
 
         } else {

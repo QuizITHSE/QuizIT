@@ -116,7 +116,7 @@ const QuizList: React.FC = () => {
   };
 
   const handleStartQuiz = (quizId: string) => {
-    navigate(`/host?id=${quizId}`);
+    navigate(`/game-settings?id=${quizId}`);
   };
 
   if (loading) {

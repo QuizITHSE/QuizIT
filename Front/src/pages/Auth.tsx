@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 
 
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc } from "firebase/firestore";
 import { db, app } from '@/lib/firebase';
 
 import { useForm } from "react-hook-form"
@@ -82,28 +82,43 @@ function Auth() {
     // Логика логина
     const handleLogin = async (values: { email: string, password: string }) => {
         setIsLoggingIn(true);
+        
+        // Отладка: проверяем данные перед отправкой
+        console.log("Попытка входа с данными:");
+        console.log("Email:", `"${values.email}"`);
+        console.log("Password length:", values.password.length);
+        console.log("Password (первые 3 символа):", values.password.substring(0, 3) + "***");
+        
         try {
             const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth");
             const auth = getAuth();
             
-            await signInWithEmailAndPassword(auth, values.email, values.password);
+            await signInWithEmailAndPassword(auth, values.email.trim(), values.password);
             console.log("Успешный вход:", values.email);
             navigate("/");
-        } catch (error: any) {
-            console.error("Ошибка входа:", error);
-            if (error.code === "auth/user-not-found") {
+    } catch (error: any) {
+        console.error("Ошибка входа:", error);
+        console.error("Код ошибки:", error.code);
+        console.error("Сообщение ошибки:", error.message);
+        console.error("Email для входа:", values.email);
+        console.error("Длина пароля:", values.password.length);
+        if (error.code === "auth/user-not-found") {
                 loginForm.setError("email", { message: "Пользователь с такой почтой не найден" });
             } else if (error.code === "auth/wrong-password") {
                 loginForm.setError("password", { message: "Неверный пароль" });
             } else if (error.code === "auth/invalid-email") {
                 loginForm.setError("email", { message: "Некорректный формат почты" });
-            } else if (error.code === "auth/invalid-credential") {
-                loginForm.setError("root", { message: "Неверный email или пароль. Проверьте правильность введенных данных." });
-            } else if (error.code === "auth/too-many-requests") {
-                loginForm.setError("root", { message: "Слишком много попыток входа. Попробуйте позже." });
-            } else {
-                loginForm.setError("root", { message: "Ошибка входа: " + (error.message || "Неизвестная ошибка") });
-            }
+        } else if (error.code === "auth/invalid-credential") {
+            loginForm.setError("root", { message: "Неверный email или пароль. Если вы сбросили пароль, проверьте почту для получения ссылки на сброс." });
+        } else if (error.code === "auth/too-many-requests") {
+            loginForm.setError("root", { message: "Слишком много попыток входа. Попробуйте позже." });
+        } else if (error.code === "auth/user-disabled") {
+            loginForm.setError("root", { message: "Аккаунт отключен. Обратитесь к администратору." });
+        } else if (error.code === "auth/network-request-failed") {
+            loginForm.setError("root", { message: "Ошибка сети. Проверьте подключение к интернету." });
+        } else {
+            loginForm.setError("root", { message: "Ошибка входа: " + (error.message || "Неизвестная ошибка") });
+        }
         } finally {
             setIsLoggingIn(false);
         }
@@ -177,13 +192,13 @@ function Auth() {
         setIsUserCreating(true);
         console.log("Выбранный тип пользователя:", userType);
         try {
-            const docRef = await addDoc(collection(db, "users"), {
+            // Используем UID как document ID
+            await setDoc(doc(db, "users", userCreds.uid), {
               isTeacher: userType === "teacher" ? true : false,
               name: signupForm.getValues("firstName"),
               lastName: signupForm.getValues("lastName"),
-              userId: userCreds.uid,
             });
-            console.log("Document written with ID: ", docRef.id);
+            console.log("Document written with ID: ", userCreds.uid);
             if(userType === "teacher"){ 
                 navigate("/create-group")
             } else {
