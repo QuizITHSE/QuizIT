@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, getDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContents, TabsContent } from '@/components/animate-ui/components/tabs';
-import { Trophy, Users, Calendar, Clock, BarChart3 } from 'lucide-react';
+import { Trophy, Users, Calendar, Clock, BarChart3, Eye } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface Game {
   id: string;
@@ -28,6 +30,7 @@ const QuizResults: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('recent');
+  const navigate = useNavigate();
 
   useEffect(() => {
     console.log('🚀 QuizResults component mounted, setting up auth listener...');
@@ -42,34 +45,26 @@ const QuizResults: React.FC = () => {
         console.log('🔍 Starting QuizResults query process...');
         console.log('👤 Current user UID:', user.uid);
         
-        // First, find the user document ID from the users collection
-        console.log('📋 Querying users collection for userId:', user.uid);
-        const userQuery = query(
-          collection(db, 'users'),
-          where('userId', '==', user.uid)
-        );
+        // Get user data directly by UID
+        console.log('📋 Getting user document by UID:', user.uid);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
         
-        const userSnapshot = await getDocs(userQuery);
-        console.log('📊 User query results:', {
-          empty: userSnapshot.empty,
-          size: userSnapshot.size,
-          docs: userSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
-        });
+        console.log('📊 User document exists:', userDoc.exists());
         
-        if (userSnapshot.empty) {
+        if (!userDoc.exists()) {
           console.error('❌ User document not found for UID:', user.uid);
           setLoading(false);
           return;
         }
         
-        const userDocId = userSnapshot.docs[0].id;
-        console.log('✅ Found user document ID:', userDocId);
+        const userData = userDoc.data();
+        console.log('👤 User data:', userData);
         
-        // Now fetch all finished games for the current user as host using the document ID
-        console.log('🎮 Querying games collection for host:', userDocId);
+        // Now fetch all finished games for the current user as host using the UID directly
+        console.log('🎮 Querying games collection for host:', user.uid);
         const q = query(
           collection(db, 'games'),
-          where('host', '==', userDocId),
+          where('host', '==', user.uid),
           where('game_finished', '==', true),
           orderBy('finished_at', 'desc')
         );
@@ -99,33 +94,25 @@ const QuizResults: React.FC = () => {
         console.log('🔄 Trying fallback query without orderBy...');
         // Try without orderBy if index is not set up
         try {
-          // First, find the user document ID from the users collection
-          console.log('📋 Fallback: Querying users collection for userId:', user.uid);
-          const userQuery = query(
-            collection(db, 'users'),
-            where('userId', '==', user.uid)
-          );
+          // Get user data directly by UID (fallback)
+          console.log('📋 Fallback: Getting user document by UID:', user.uid);
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
           
-          const userSnapshot = await getDocs(userQuery);
-          console.log('📊 Fallback user query results:', {
-            empty: userSnapshot.empty,
-            size: userSnapshot.size,
-            docs: userSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
-          });
+          console.log('📊 Fallback: User document exists:', userDoc.exists());
           
-          if (userSnapshot.empty) {
+          if (!userDoc.exists()) {
             console.error('❌ Fallback: User document not found for UID:', user.uid);
             setLoading(false);
             return;
           }
           
-          const userDocId = userSnapshot.docs[0].id;
-          console.log('✅ Fallback: Found user document ID:', userDocId);
+          const userData = userDoc.data();
+          console.log('👤 Fallback: User data:', userData);
           
-          console.log('🎮 Fallback: Querying games collection for host:', userDocId);
+          console.log('🎮 Fallback: Querying games collection for host:', user.uid);
           const q = query(
             collection(db, 'games'),
-            where('host', '==', userDocId),
+            where('host', '==', user.uid),
             where('game_finished', '==', true)
           );
           
@@ -199,6 +186,10 @@ const QuizResults: React.FC = () => {
     // This would need to be fetched from the quiz data
     // For now, we'll use a placeholder
     return 'N/A';
+  };
+
+  const handleViewDetailedResults = (gameId: string) => {
+    navigate(`/results/${gameId}`);
   };
 
   const recentGames = games.slice(0, 5);
@@ -286,6 +277,15 @@ const QuizResults: React.FC = () => {
                           {game.final_results?.length || 0} участников
                         </div>
                       </div>
+                      
+                      <Button
+                        onClick={() => handleViewDetailedResults(game.id)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                        size="sm"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Просмотреть результаты
+                      </Button>
                     </CardContent>
                   </Card>
                 );
@@ -338,6 +338,15 @@ const QuizResults: React.FC = () => {
                           {game.final_results?.length || 0} участников
                         </div>
                       </div>
+                      
+                      <Button
+                        onClick={() => handleViewDetailedResults(game.id)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                        size="sm"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Просмотреть результаты
+                      </Button>
                     </CardContent>
                   </Card>
                 );

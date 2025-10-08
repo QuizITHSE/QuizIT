@@ -83,6 +83,7 @@ const HostQuiz: React.FC = () => {
   const [gameResults, setGameResults] = useState<GameResultsData | null>(null);
 
   const quizId = searchParams.get('id');
+  const groupId = searchParams.get('group');
 
   // WebSocket connection
   useEffect(() => {
@@ -218,41 +219,29 @@ const HostQuiz: React.FC = () => {
         // Wait for auth state to be ready
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
           if (user) {
-            console.log('✅ Пользователь аутентифицирован, ищем document ID...');
+            console.log('✅ Пользователь аутентифицирован, отправляем UID...');
             
             try {
-              // Find the user document ID from the users collection
-              const { collection: firestoreCollection, query: firestoreQuery, where: firestoreWhere, getDocs: firestoreGetDocs } = await import('firebase/firestore');
-              const userQuery = firestoreQuery(
-                firestoreCollection(db, 'users'), 
-                firestoreWhere('userId', '==', user.uid)
-              );
+              // Проверяем, что пользователь существует
+              const userDoc = await getDoc(doc(db, 'users', user.uid));
               
-              const userSnapshot = await firestoreGetDocs(userQuery);
-              console.log('📊 User query results:', {
-                empty: userSnapshot.empty,
-                size: userSnapshot.size,
-                docs: userSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
-              });
-              
-              if (userSnapshot.empty) {
+              if (!userDoc.exists()) {
                 console.error('❌ User document not found for UID:', user.uid);
                 unsubscribe();
                 return;
               }
               
-              const userDocId = userSnapshot.docs[0].id;
-              console.log('✅ Found user document ID:', userDocId);
+              console.log('✅ User document found, sending UID:', user.uid);
               
-              // Send auth message with the document ID
-              const authMessage = { user_id: userDocId };
+              // Send auth message with the UID directly
+              const authMessage = { user_id: user.uid };
               console.log('📤 Отправляем AUTH:', authMessage);
               ws.send(JSON.stringify(authMessage));
               setAuthSent(true);
               unsubscribe(); // Clean up the listener
               
             } catch (error) {
-              console.error('❌ Ошибка при поиске user document:', error);
+              console.error('❌ Ошибка при проверке user document:', error);
               unsubscribe();
             }
           } else {
@@ -268,14 +257,14 @@ const HostQuiz: React.FC = () => {
 
   // Send create quiz message when quiz is loaded AND auth is successful
   useEffect(() => {
-    if (wsConnected && ws && quiz && quizId && authSuccess && !quizCreated) {
+    if (wsConnected && ws && quiz && quizId && groupId && authSuccess && !quizCreated) {
       console.log('🎮 Отправляем сообщение создания квиза...');
-      const createQuizMessage = {quiz: "FrDJQ2INCzyCSyWFbXlv", group: "BJwLRRsHfCaUxNzIEc8P"}
+      const createQuizMessage = {quiz: quizId, group: groupId};
       console.log('📤 Отправляем CREATE_QUIZ:', createQuizMessage);
       ws.send(JSON.stringify(createQuizMessage));
       setQuizCreated(true);
     }
-  }, [wsConnected, ws, quiz, quizId, authSuccess, quizCreated]);
+  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated]);
 
   // Timer countdown
   useEffect(() => {
@@ -333,16 +322,14 @@ const HostQuiz: React.FC = () => {
 
       // Check if user is teacher
       try {
-        const { collection: firestoreCollection, query: firestoreQuery, where: firestoreWhere, getDocs: firestoreGetDocs } = await import('firebase/firestore');
-        const q = firestoreQuery(firestoreCollection(db, 'users'), firestoreWhere('userId', '==', user.uid));
-        const querySnapshot = await firestoreGetDocs(q);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
         
-        if (querySnapshot.empty) {
+        if (!userDoc.exists()) {
           navigate('/auth');
           return;
         }
         
-        const userData = querySnapshot.docs[0].data();
+        const userData = userDoc.data();
         setIsTeacher(userData.isTeacher);
         
         if (!userData.isTeacher) {
@@ -490,7 +477,12 @@ const HostQuiz: React.FC = () => {
             />
           ) : currentQuestion ? (
             /* Question Display */
-            <QuizContent questionData={currentQuestion} timeLeft={timeLeft} />
+            <QuizContent 
+              questionData={currentQuestion} 
+              timeLeft={timeLeft} 
+              onSubmitAnswer={() => {}}
+              isHost={true}
+            />
           ) : (
             /* Waiting Screen */
             <div>

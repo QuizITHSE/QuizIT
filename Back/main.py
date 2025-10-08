@@ -212,9 +212,11 @@ class Lobby:
         await self.host.ws_id.send(json.dumps({"type": "round_results", "data": info_for_host}))
         
         # Send round results with answer correctness and scoreboard to all players
+        answered_user_ids = set()
         for answer_info in self.answers:
             answer = answer_info["answer"]
             is_correct = answer == self.quiz["questions"][self.current_question]["correct"]
+            answered_user_ids.add(answer_info["user"].user_id)
             
             await answer_info["user"].ws_id.send(json.dumps({
                 "type": "round_ended",
@@ -222,6 +224,18 @@ class Lobby:
                 "scoreboard": self.score_board,
                 "question_points": question_points
             }))
+        
+        # Notify players who did not answer in time
+        for player in self.players:
+            if player.user_id not in answered_user_ids:
+                await player.ws_id.send(json.dumps({
+                    "type": "round_ended",
+                    "correct": False,
+                    "missed": True,
+                    "message": "Время вышло! Вы не успели ответить на вопрос.",
+                    "scoreboard": self.score_board,
+                    "question_points": question_points
+                }))
         
         # Clear answers for next question
         self.answers = []
@@ -316,9 +330,7 @@ class Lobby:
 
 
 async def on_question_timer_end(dispatch_round_number, lobby: Lobby, question):
-    #TODO: remove only for debug
-    #await asyncio.sleep(question["timeLimit"])
-    await asyncio.sleep(15)
+    await asyncio.sleep(question["timeLimit"])
     
     # Only finish round if timer expired and round is still active
     if lobby.currently_round and lobby.current_question == dispatch_round_number:
