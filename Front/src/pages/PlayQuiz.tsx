@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getDoc, doc } from 'firebase/firestore';
@@ -46,6 +46,9 @@ const PlayQuiz: React.FC = () => {
     totalPlayers: number;
   } | null>(null);
   const [userUid, setUserUid] = useState<string | null>(null);
+  const [gameMode, setGameMode] = useState<'normal' | 'lockdown' | 'tab_tracking'>('normal');
+  const [isKicked, setIsKicked] = useState(false);
+  const [kickReason, setKickReason] = useState<string>('');
 
   const gameCodeParam = searchParams.get('code');
 
@@ -88,6 +91,16 @@ const PlayQuiz: React.FC = () => {
           case 'auth_success':
             console.log('✅ Аутентификация успешна:', message.message);
             setAuthSuccess(true);
+            break;
+            
+          case 'joined':
+            console.log('🎮 Присоединился к игре:', message);
+            setGameJoined(true);
+            // Get game mode from settings
+            if (message.game_settings?.mode) {
+              setGameMode(message.game_settings.mode);
+              console.log('🎮 Режим игры:', message.game_settings.mode);
+            }
             break;
             
           case 'game_joined':
@@ -139,6 +152,23 @@ const PlayQuiz: React.FC = () => {
             setCurrentQuestion(null);
             setRoundResult(null);
             setTimerActive(false);
+            break;
+            
+          case 'kicked':
+            console.log('🚫 Вы были удалены из игры:', message);
+            setIsKicked(true);
+            setKickReason(message.message || 'Вы были удалены из игры');
+            setCurrentQuestion(null);
+            setRoundResult(null);
+            setTimerActive(false);
+            break;
+            
+          case 'tab_switch_recorded':
+            console.log('📊 Переключение вкладки зафиксировано:', message.message);
+            break;
+            
+          case 'player_removed':
+            console.log('🚫 Игрок удален:', message);
             break;
             
           default:
@@ -197,6 +227,28 @@ const PlayQuiz: React.FC = () => {
     }
   }, [wsConnected, ws, authSuccess, gameCode, gameCodeParam, gameJoined, playerName]);
 
+  // Function to report cheating attempt (useCallback to avoid recreating in useEffect)
+  const reportCheating = useCallback(() => {
+    if (ws && ws.readyState === WebSocket.OPEN && gameJoined) {
+      console.log('🚨 Отправляем отчет о переключении вкладки');
+      const reportMessage = { 
+        report: "switched_tabs"
+      };
+      try {
+        ws.send(JSON.stringify(reportMessage));
+        console.log('✅ Отчет о нарушении отправлен');
+      } catch (error) {
+        console.error('❌ Ошибка при отправке отчета:', error);
+      }
+    } else {
+      console.log('⚠️ WebSocket не готов к отправке отчета:', { 
+        wsExists: !!ws, 
+        wsState: ws?.readyState,
+        gameJoined 
+      });
+    }
+  }, [ws, gameJoined]);
+
   // Timer countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -210,6 +262,87 @@ const PlayQuiz: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [timerActive, timeLeft]);
+
+  // Handle cheating detection based on game mode
+  useEffect(() => {
+    if (!gameJoined || gameMode === 'normal') {
+      console.log('⚪ Отслеживание отключено:', { gameJoined, gameMode });
+      return;
+    }
+
+    console.log('🔍 Активировано отслеживание нарушений. Режим:', gameMode);
+    let blurTimeout: NodeJS.Timeout | null = null;
+
+    const handleVisibilityChange = () => {
+      console.log('👁️ visibilitychange event:', { 
+        hidden: document.hidden, 
+        gameMode,
+        wsReady: ws?.readyState === WebSocket.OPEN 
+      });
+      
+      if (document.hidden && (gameMode === 'lockdown' || gameMode === 'tab_tracking')) {
+        console.log('🚨 Обнаружено переключение вкладки - отправляем отчет');
+        reportCheating();
+      }
+    };
+
+    const handleBlur = () => {
+      console.log('👁️ blur event:', { gameMode, wsReady: ws?.readyState === WebSocket.OPEN });
+      
+      // Debounce blur events to avoid multiple reports
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+      }
+      
+      blurTimeout = setTimeout(() => {
+        // Only report if tab is actually hidden (not just clicking on devtools)
+        if (document.hidden && (gameMode === 'lockdown' || gameMode === 'tab_tracking')) {
+          console.log('🚨 Подтверждена потеря фокуса - отправляем отчет');
+          reportCheating();
+        }
+      }, 500); // Wait 500ms to confirm the blur
+    };
+
+    const handleFullscreenChange = () => {
+      console.log('👁️ fullscreenchange event:', { 
+        isFullscreen: !!document.fullscreenElement, 
+        gameMode,
+        wsReady: ws?.readyState === WebSocket.OPEN 
+      });
+      
+      if (gameMode === 'lockdown' && !document.fullscreenElement) {
+        console.log('🚨 Обнаружен выход из полноэкранного режима - отправляем отчет');
+        reportCheating();
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    console.log('✅ Event listeners добавлены');
+
+    // Request fullscreen for lockdown mode
+    if (gameMode === 'lockdown' && gameJoined && !document.fullscreenElement) {
+      console.log('🔒 Запрашиваем полноэкранный режим для lockdown mode');
+      const elem = document.documentElement;
+      elem.requestFullscreen().catch((err) => {
+        console.error('❌ Ошибка при входе в полноэкранный режим:', err);
+        alert('Для режима блокировки требуется полноэкранный режим. Пожалуйста, разрешите полноэкранный режим.');
+      });
+    }
+
+    return () => {
+      console.log('🧹 Очистка event listeners');
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [gameJoined, gameMode, reportCheating, ws]);
 
   // Check user authentication and role
   useEffect(() => {
@@ -350,6 +483,38 @@ const PlayQuiz: React.FC = () => {
     );
   }
 
+  // If kicked, show kicked screen
+  if (isKicked) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
+        <div className="max-w-lg w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center">
+            <div className="w-20 h-20 rounded-full bg-red-500 flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </div>
+            
+            <h2 className="text-3xl font-bold text-red-800 mb-4">
+              Удалены из игры
+            </h2>
+            
+            <p className="text-lg text-gray-700 mb-6">
+              {kickReason}
+            </p>
+            
+            <Button
+              onClick={() => navigate('/')}
+              className="bg-blue-600 hover:bg-blue-700 px-8 py-3 text-lg cursor-pointer"
+            >
+              На главную
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full montserrat-600 bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -368,6 +533,15 @@ const PlayQuiz: React.FC = () => {
                 <div className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-mono">
                   <span className="mr-2">Код:</span>
                   <span className="font-bold">{gameCode || gameCodeParam}</span>
+                </div>
+              )}
+              {gameMode !== 'normal' && (
+                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                  gameMode === 'lockdown' 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {gameMode === 'lockdown' ? '🔒 Режим блокировки' : '👁️ Отслеживание вкладок'}
                 </div>
               )}
               <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
@@ -578,7 +752,30 @@ const PlayQuiz: React.FC = () => {
                 <p>Статус подключения: {wsConnected ? '✅ Подключено' : '❌ Отключено'}</p>
                 <p>Аутентификация: {authSent ? (authSuccess ? '✅ Успешна' : '⏳ Ожидание ответа') : '❌ Не отправлена'}</p>
                 <p>Присоединение к игре: {gameJoined ? '✅ Присоединен' : (authSuccess ? '⏳ Готово к присоединению' : '❌ Ожидание аутентификации')}</p>
+                <p>Режим игры: {gameMode === 'lockdown' ? '🔒 Lockdown' : gameMode === 'tab_tracking' ? '👁️ Tab Tracking' : '📝 Normal'}</p>
+                <p>WebSocket: {ws?.readyState === WebSocket.OPEN ? '✅ Открыто' : ws?.readyState === WebSocket.CONNECTING ? '⏳ Подключение' : '❌ Закрыто'}</p>
               </div>
+              
+              {/* Test button for development */}
+              {(gameMode === 'tab_tracking' || gameMode === 'lockdown') && gameJoined && (
+                <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800 mb-2 font-semibold">🧪 Режим отладки</p>
+                  <Button
+                    onClick={() => {
+                      console.log('🧪 Тестовая кнопка: отправка отчета о нарушении');
+                      reportCheating();
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer bg-white hover:bg-yellow-100 text-yellow-800 border-yellow-300"
+                  >
+                    Тест: Отправить отчет
+                  </Button>
+                  <p className="text-xs text-yellow-700 mt-2">
+                    Откройте консоль браузера (F12) для просмотра логов отправки
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

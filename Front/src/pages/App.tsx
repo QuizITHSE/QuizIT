@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { auth, db } from '@/lib/firebase';
 import QuizList from '@/components/QuizList';
 import QuizResults from '@/components/QuizResults';
-import { Play, Users } from 'lucide-react';
+import { Play, Users, TrendingUp } from 'lucide-react';
 
 function App() {
   const navigate = useNavigate();
@@ -240,6 +240,31 @@ function App() {
                 >
                   <Users className="h-5 w-5 mr-2" />
                   Ввести код
+                </Button>
+              </div>
+            </div>
+            
+            {/* My Results Option */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="bg-purple-100 p-3 rounded-full mr-4">
+                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Мои результаты</h2>
+                    <p className="text-gray-600">
+                      Просмотрите историю ваших игр и достижения
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate('/my-results')}
+                  variant="outline"
+                  className="px-6 py-3 text-lg cursor-pointer"
+                >
+                  <TrendingUp className="h-5 w-5 mr-2" />
+                  Посмотреть
                 </Button>
               </div>
             </div>

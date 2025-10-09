@@ -4,7 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContents, TabsContent } from '@/components/animate-ui/components/tabs';
-import { Trophy, Users, Calendar, Clock, BarChart3, Eye } from 'lucide-react';
+import { Trophy, Users, Calendar, Clock, BarChart3, Eye, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,12 +18,17 @@ interface Game {
   code: string;
   finished_at?: any;
   final_results?: LeaderboardEntry[];
+  type?: {
+    mode?: 'normal' | 'lockdown' | 'tab_tracking';
+  };
+  game_mode?: 'normal' | 'lockdown' | 'tab_tracking';
 }
 
 interface LeaderboardEntry {
   username: string;
   score: number;
   user_id: string;
+  tab_switches?: number;
 }
 
 const QuizResults: React.FC = () => {
@@ -188,6 +193,28 @@ const QuizResults: React.FC = () => {
     return 'N/A';
   };
 
+  const getTotalTabSwitches = (game: Game) => {
+    if (!game.final_results) return 0;
+    return game.final_results.reduce((total, player) => total + (player.tab_switches || 0), 0);
+  };
+
+  const hasTabTracking = (game: Game) => {
+    const mode = game.game_mode || game.type?.mode;
+    return mode === 'tab_tracking' || mode === 'lockdown';
+  };
+
+  const getGameModeLabel = (game: Game) => {
+    const mode = game.game_mode || game.type?.mode || 'normal';
+    switch (mode) {
+      case 'lockdown':
+        return { label: '🔒 Режим блокировки', color: 'text-red-600' };
+      case 'tab_tracking':
+        return { label: '👁️ Отслеживание вкладок', color: 'text-yellow-600' };
+      default:
+        return { label: '📝 Обычный режим', color: 'text-gray-600' };
+    }
+  };
+
   const handleViewDetailedResults = (gameId: string) => {
     navigate(`/results/${gameId}`);
   };
@@ -236,6 +263,8 @@ const QuizResults: React.FC = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {recentGames.map((game) => {
                 const topPlayer = getTopPlayer(game);
+                const totalTabSwitches = getTotalTabSwitches(game);
+                const gameMode = getGameModeLabel(game);
                 return (
                   <Card key={game.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
@@ -248,9 +277,14 @@ const QuizResults: React.FC = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Users className="h-4 w-4 mr-2" />
-                        <span>{getTotalPlayers(game)} игроков</span>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center text-gray-600">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span>{getTotalPlayers(game)} игроков</span>
+                        </div>
+                        <div className={`text-xs font-medium ${gameMode.color}`}>
+                          {gameMode.label}
+                        </div>
                       </div>
                       
                       {topPlayer && (
@@ -264,6 +298,17 @@ const QuizResults: React.FC = () => {
                               <p className="text-lg font-bold text-blue-600">{topPlayer.score}</p>
                               <p className="text-xs text-gray-500">очков</p>
                             </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {hasTabTracking(game) && totalTabSwitches > 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                          <div className="flex items-center text-xs text-yellow-800">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            <span className="font-medium">
+                              {totalTabSwitches} переключени{totalTabSwitches === 1 ? 'е' : totalTabSwitches < 5 ? 'я' : 'й'} вкладок
+                            </span>
                           </div>
                         </div>
                       )}
@@ -297,6 +342,8 @@ const QuizResults: React.FC = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {allGames.map((game) => {
                 const topPlayer = getTopPlayer(game);
+                const totalTabSwitches = getTotalTabSwitches(game);
+                const gameMode = getGameModeLabel(game);
                 return (
                   <Card key={game.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
@@ -309,9 +356,14 @@ const QuizResults: React.FC = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Users className="h-4 w-4 mr-2" />
-                        <span>{getTotalPlayers(game)} игроков</span>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center text-gray-600">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span>{getTotalPlayers(game)} игроков</span>
+                        </div>
+                        <div className={`text-xs font-medium ${gameMode.color}`}>
+                          {gameMode.label}
+                        </div>
                       </div>
                       
                       {topPlayer && (
@@ -325,6 +377,17 @@ const QuizResults: React.FC = () => {
                               <p className="text-lg font-bold text-blue-600">{topPlayer.score}</p>
                               <p className="text-xs text-gray-500">очков</p>
                             </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {hasTabTracking(game) && totalTabSwitches > 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                          <div className="flex items-center text-xs text-yellow-800">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            <span className="font-medium">
+                              {totalTabSwitches} переключени{totalTabSwitches === 1 ? 'е' : totalTabSwitches < 5 ? 'я' : 'й'} вкладок
+                            </span>
                           </div>
                         </div>
                       )}
