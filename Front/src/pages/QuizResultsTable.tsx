@@ -4,7 +4,7 @@ import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firesto
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Users, BarChart3, Download, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, BarChart3, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   createColumnHelper,
@@ -22,6 +22,7 @@ interface QuizResult {
   total_questions: number;
   user_id: string;
   username: string;
+  tab_switches?: number;
 }
 
 const QuizResultsTable: React.FC = () => {
@@ -31,6 +32,7 @@ const QuizResultsTable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [gameMode, setGameMode] = useState<'normal' | 'lockdown' | 'tab_tracking'>('normal');
 
   const columnHelper = createColumnHelper<QuizResult>();
 
@@ -113,9 +115,35 @@ const QuizResultsTable: React.FC = () => {
     }),
   ];
 
+  // Add tab switches column conditionally
+  if (gameMode === 'tab_tracking' || gameMode === 'lockdown') {
+    columns.push(
+      columnHelper.accessor('tab_switches', {
+        header: 'Переключения вкладок',
+        cell: (info) => {
+          const switches = info.getValue() || 0;
+          return (
+            <div className="flex items-center justify-center">
+              {switches > 0 ? (
+                <div className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  <span className="text-sm font-semibold">{switches}</span>
+                </div>
+              ) : (
+                <span className="text-sm text-green-600">0</span>
+              )}
+            </div>
+          );
+        },
+      })
+    );
+  }
+
+  const finalColumns = columns;
+
   const table = useReactTable({
     data: results,
-    columns,
+    columns: finalColumns,
     state: {
       sorting,
     },
@@ -130,14 +158,22 @@ const QuizResultsTable: React.FC = () => {
       return;
     }
 
-    const csvData = results.map(result => ({
-      'Место': result.placement,
-      'Имя участника': result.username,
-      'Очки': result.score,
-      'Всего вопросов': result.total_questions,
-      'Процент': Math.round((result.score / result.total_questions) * 100),
-      'Всего участников': result.total_players
-    }));
+    const csvData = results.map(result => {
+      const data: any = {
+        'Место': result.placement,
+        'Имя участника': result.username,
+        'Очки': result.score,
+        'Всего вопросов': result.total_questions,
+        'Процент': Math.round((result.score / result.total_questions) * 100),
+        'Всего участников': result.total_players
+      };
+      
+      if (gameMode === 'tab_tracking' || gameMode === 'lockdown') {
+        data['Переключения вкладок'] = result.tab_switches || 0;
+      }
+      
+      return data;
+    });
 
     const csvContent = [
       Object.keys(csvData[0]).join(','),
@@ -161,14 +197,22 @@ const QuizResultsTable: React.FC = () => {
       return;
     }
 
-    const excelData = results.map(result => ({
-      'Место': result.placement,
-      'Имя участника': result.username,
-      'Очки': result.score,
-      'Всего вопросов': result.total_questions,
-      'Процент': Math.round((result.score / result.total_questions) * 100),
-      'Всего участников': result.total_players
-    }));
+    const excelData = results.map(result => {
+      const data: any = {
+        'Место': result.placement,
+        'Имя участника': result.username,
+        'Очки': result.score,
+        'Всего вопросов': result.total_questions,
+        'Процент': Math.round((result.score / result.total_questions) * 100),
+        'Всего участников': result.total_players
+      };
+      
+      if (gameMode === 'tab_tracking' || gameMode === 'lockdown') {
+        data['Переключения вкладок'] = result.tab_switches || 0;
+      }
+      
+      return data;
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
@@ -187,6 +231,15 @@ const QuizResultsTable: React.FC = () => {
 
       try {
         console.log('🔍 Загружаем результаты для игры:', gameId);
+        
+        // Get game data to check game mode
+        const gameDoc = await getDoc(doc(db, 'games', gameId));
+        if (gameDoc.exists()) {
+          const gameData = gameDoc.data();
+          const mode = gameData.game_mode || gameData.type?.mode || 'normal';
+          setGameMode(mode as 'normal' | 'lockdown' | 'tab_tracking');
+          console.log('🎮 Режим игры:', mode);
+        }
         
         // Получаем результаты из подколлекции results для конкретной игры
         const resultsQuery = query(
@@ -217,6 +270,7 @@ const QuizResultsTable: React.FC = () => {
             total_questions: data.total_questions || 0,
             user_id: data.user_id || doc.id,
             username: data.username || 'Неизвестный участник',
+            tab_switches: data.tab_switches || 0,
           });
         });
         
@@ -311,6 +365,8 @@ const QuizResultsTable: React.FC = () => {
   const totalPlayers = results.length > 0 ? results[0].total_players : 0;
   const totalQuestions = results.length > 0 ? results[0].total_questions : 0;
   const averageScore = results.length > 0 ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length) : 0;
+  const totalTabSwitches = results.reduce((sum, r) => sum + (r.tab_switches || 0), 0);
+  const playersWithSwitches = results.filter(r => (r.tab_switches || 0) > 0).length;
 
   return (
     <div className="min-h-screen w-full montserrat-600 bg-gray-50">
@@ -337,7 +393,7 @@ const QuizResultsTable: React.FC = () => {
         </div>
 
         {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className={`grid grid-cols-1 md:grid-cols-${(gameMode === 'tab_tracking' || gameMode === 'lockdown') ? '4' : '3'} gap-6 mb-6`}>
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <Users className="h-8 w-8 text-blue-600 mr-3" />
@@ -367,6 +423,25 @@ const QuizResultsTable: React.FC = () => {
               </div>
             </div>
           </div>
+          
+          {(gameMode === 'tab_tracking' || gameMode === 'lockdown') && (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <AlertTriangle className="h-8 w-8 text-yellow-600 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Переключения вкладок</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-2xl font-bold text-gray-900">{totalTabSwitches}</p>
+                    {playersWithSwitches > 0 && (
+                      <span className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full">
+                        {playersWithSwitches} игрок{playersWithSwitches === 1 ? '' : playersWithSwitches < 5 ? 'а' : 'ов'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Results Table */}

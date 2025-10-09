@@ -11,6 +11,7 @@ import HostQuiz from './pages/HostQuiz.tsx'
 import PlayQuiz from './pages/PlayQuiz.tsx'
 import GameSettings from './pages/GameSettings.tsx'
 import QuizResultsTable from './pages/QuizResultsTable.tsx'
+import StudentGameOverview from './pages/StudentGameOverview.tsx'
 
 const router = createBrowserRouter([
   { path: '/', element: <App/>},
@@ -21,7 +22,8 @@ const router = createBrowserRouter([
   { path: '/game-settings', element: <GameSettings/>},
   { path: '/host', element: <HostQuiz/>},
   { path: '/play', element: <PlayQuiz/>},
-  { path: '/results/:gameId', element: <QuizResultsTable/>}
+  { path: '/results/:gameId', element: <QuizResultsTable/>},
+  { path: '/my-results', element: <StudentGameOverview/>}
 ])
 
 

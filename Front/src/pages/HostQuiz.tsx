@@ -84,6 +84,7 @@ const HostQuiz: React.FC = () => {
 
   const quizId = searchParams.get('id');
   const groupId = searchParams.get('group');
+  const gameMode = searchParams.get('gameMode') || 'normal';
 
   // WebSocket connection
   useEffect(() => {
@@ -259,12 +260,18 @@ const HostQuiz: React.FC = () => {
   useEffect(() => {
     if (wsConnected && ws && quiz && quizId && groupId && authSuccess && !quizCreated) {
       console.log('🎮 Отправляем сообщение создания квиза...');
-      const createQuizMessage = {quiz: quizId, group: groupId};
+      const createQuizMessage = {
+        quiz: quizId, 
+        group: groupId, 
+        game_type: {
+          mode: gameMode
+        }
+      };
       console.log('📤 Отправляем CREATE_QUIZ:', createQuizMessage);
       ws.send(JSON.stringify(createQuizMessage));
       setQuizCreated(true);
     }
-  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated]);
+  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated, gameMode]);
 
   // Timer countdown
   useEffect(() => {

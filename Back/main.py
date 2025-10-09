@@ -90,7 +90,7 @@ class User:
 
 
 class Lobby:
-    def __init__(self, host, quiz, game_id, code):
+    def __init__(self, host, quiz, game_id, code, game_type=None):
         self.host = host
         self.quiz = quiz
         self.game_id = game_id
@@ -100,9 +100,13 @@ class Lobby:
         self.code = code
         self.started = False
         self.currently_round = False
+        self.finished = False  # Track if game has been completed
         self.current_question = -1
         self.answers = []
         self.results = {}  # Store final results for each student
+        self.game_type = game_type or {}  # Game mode: normal, lockdown, or tab_tracking
+        self.tab_switches = {}  # Track tab switches for each user {user_id: count}
+        self.user_answers = {}  # Track all answers for each user {user_id: [{question_num, answer, correct, points}]}
 
 
 
@@ -113,6 +117,8 @@ class Lobby:
         self.players_ids.append(user.user_id)
         self.players.append(user)
         self.score_board[user.user_id] = [user.username, 0]
+        self.tab_switches[user.user_id] = 0  # Initialize tab switch counter
+        self.user_answers[user.user_id] = []  # Initialize answers list for user
         db.collection("games").document(self.game_id).update({
             "players": firestore.ArrayUnion(self.players_ids)
         })
@@ -152,14 +158,32 @@ class Lobby:
         self.answers.append({"user": user, "answer": answer})
         
         # Check if answer is correct and update score immediately
-        is_correct = answer == self.quiz["questions"][self.current_question]["correct"]
+        current_q = self.quiz["questions"][self.current_question]
+        correct_answer = current_q["correct"]
+        is_correct = answer == correct_answer
+        question_points = current_q.get("point", 1)
+        points_earned = question_points if is_correct else 0
+        
         if is_correct:
-            # Get points from question (default to 1 if not specified)
-            question_points = self.quiz["questions"][self.current_question].get("point", 1)
             self.score_board[user.user_id][1] += question_points
             await user.ws_id.send(json.dumps({"correct": True, "points_earned": question_points}))
         else:
             await user.ws_id.send(json.dumps({"correct": False, "points_earned": 0}))
+        
+        # Store the answer details for this user
+        answer_record = {
+            "question_number": self.current_question,
+            "question_text": current_q.get("question", ""),
+            "question_type": current_q.get("type", "single"),
+            "options": current_q.get("options", []),
+            "user_answer": answer,
+            "correct_answer": correct_answer,
+            "is_correct": is_correct,
+            "points_earned": points_earned,
+            "possible_points": question_points
+        }
+        self.user_answers[user.user_id].append(answer_record)
+        print(f"📝 Recorded answer for {user.username} on Q{self.current_question}: {'✓' if is_correct else '✗'} ({points_earned}/{question_points} pts)")
         
         # Send updated scoreboard to all players immediately
         await self.broadcast(json.dumps({"type": "scoreboard", "data": self.score_board}))
@@ -225,7 +249,7 @@ class Lobby:
                 "question_points": question_points
             }))
         
-        # Notify players who did not answer in time
+        # Notify players who did not answer in time and record missed answers
         for player in self.players:
             if player.user_id not in answered_user_ids:
                 await player.ws_id.send(json.dumps({
@@ -236,6 +260,23 @@ class Lobby:
                     "scoreboard": self.score_board,
                     "question_points": question_points
                 }))
+                
+                # Record missed answer
+                current_q = self.quiz["questions"][self.current_question]
+                answer_record = {
+                    "question_number": self.current_question,
+                    "question_text": current_q.get("question", ""),
+                    "question_type": current_q.get("type", "single"),
+                    "options": current_q.get("options", []),
+                    "user_answer": None,
+                    "correct_answer": current_q["correct"],
+                    "is_correct": False,
+                    "points_earned": 0,
+                    "possible_points": question_points,
+                    "missed": True
+                }
+                self.user_answers[player.user_id].append(answer_record)
+                print(f"⏱️ Recorded MISSED answer for {player.username} on Q{self.current_question}")
         
         # Clear answers for next question
         self.answers = []
@@ -262,6 +303,8 @@ class Lobby:
 
     async def finish_game(self):
         """Finish the game and send final results"""
+        self.finished = True  # Mark game as finished
+        
         # Sort players by score (descending order)
         sorted_players = sorted(self.score_board.items(), key=lambda x: x[1][1], reverse=True)
         
@@ -272,19 +315,32 @@ class Lobby:
                 "place": place,
                 "username": username,
                 "score": score,
-                "user_id": user_id
+                "user_id": user_id,
+                "tab_switches": self.tab_switches.get(user_id, 0)
             })
         
         # Populate results object for each student with their score info
         for user_id, [username, score] in self.score_board.items():
             placement = next((p["place"] for p in leaderboard if p["user_id"] == user_id), len(leaderboard))
+            
+            # Calculate answer statistics
+            user_answer_list = self.user_answers.get(user_id, [])
+            correct_count = sum(1 for ans in user_answer_list if ans.get("is_correct", False))
+            missed_count = sum(1 for ans in user_answer_list if ans.get("missed", False))
+            wrong_count = len(user_answer_list) - correct_count - missed_count
+            
             self.results[user_id] = {
                 "user_id": user_id,
                 "username": username,
                 "score": score,
                 "placement": placement,
                 "total_questions": len(self.quiz["questions"]),
-                "total_players": len(leaderboard)
+                "total_players": len(leaderboard),
+                "tab_switches": self.tab_switches.get(user_id, 0),
+                "answers": user_answer_list,
+                "correct_answers": correct_count,
+                "wrong_answers": wrong_count,
+                "missed_answers": missed_count
             }
         
         # Send individual placement to each player
@@ -298,12 +354,13 @@ class Lobby:
                     "total_players": len(leaderboard)
                 }))
         
-        # Send full leaderboard to host
+        # Send full leaderboard to host (include tab switches if tracking was enabled)
         await self.host.ws_id.send(json.dumps({
             "type": "game_finished",
             "leaderboard": leaderboard,
             "total_questions": len(self.quiz["questions"]),
-            "total_players": len(leaderboard)
+            "total_players": len(leaderboard),
+            "game_mode": self.game_type.get("mode", "normal")
         }))
         
         # Mark game as inactive and finished in Firebase
@@ -312,12 +369,15 @@ class Lobby:
                 "active": False,
                 "game_finished": True,
                 "finished_at": firestore.SERVER_TIMESTAMP,
-                "final_results": leaderboard
+                "final_results": leaderboard,
+                "game_mode": self.game_type.get("mode", "normal")
             })
             
             # Save individual student results to subcollection
             for user_id, result_data in self.results.items():
                 db.collection("games").document(self.game_id).collection("results").document(user_id).set(result_data)
+                answers_count = len(result_data.get("answers", []))
+                print(f"  ✓ Saved results for {result_data['username']}: {answers_count} answers recorded")
             
             print(f"Game {self.game_id} marked as inactive and finished in Firebase")
             print(f"Student results saved to /games/{self.game_id}/results/")
@@ -365,6 +425,10 @@ async def cleanup_user(websocket):
                     lobby.players_ids.remove(user.user_id)
                 if user.user_id in lobby.score_board:
                     del lobby.score_board[user.user_id]
+                if user.user_id in lobby.tab_switches:
+                    del lobby.tab_switches[user.user_id]
+                if user.user_id in lobby.user_answers:
+                    del lobby.user_answers[user.user_id]
             
             # Handle host disconnection
             if is_host:
@@ -376,20 +440,34 @@ async def cleanup_user(websocket):
                         "username": user.username
                     }))
                 
-                # Mark game as inactive in Firebase
-                try:
-                    db.collection("games").document(lobby.game_id).update({
-                        "active": False,
-                        "ended_reason": "host_disconnected"
-                    })
-                    print(f"Marked game {lobby.game_id} as inactive due to host disconnection")
-                except Exception as e:
-                    print(f"Error updating Firebase: {e}")
+                # Check if game was finished or not
+                if lobby.finished:
+                    # Game was completed - keep results in Firebase, just remove from local LOBBIES
+                    print(f"✅ Game {lobby.game_id} was completed. Keeping results in Firebase.")
+                else:
+                    # Game was not completed - delete from Firebase
+                    try:
+                        # First, check if there are any results subcollection documents to delete
+                        results_ref = db.collection("games").document(lobby.game_id).collection("results")
+                        results_docs = results_ref.stream()
+                        deleted_results = 0
+                        for doc in results_docs:
+                            doc.reference.delete()
+                            deleted_results += 1
+                        
+                        if deleted_results > 0:
+                            print(f"Deleted {deleted_results} result documents from game {lobby.game_id}")
+                        
+                        # Delete the main game document
+                        db.collection("games").document(lobby.game_id).delete()
+                        print(f"🗑️ Deleted incomplete game {lobby.game_id} from Firebase due to host disconnection")
+                    except Exception as e:
+                        print(f"❌ Error deleting game from Firebase: {e}")
                 
-                # Remove lobby from LOBBIES
+                # Remove lobby from LOBBIES (always, whether finished or not)
                 if lobby in LOBBIES:
                     LOBBIES.remove(lobby)
-                    print(f"Removed lobby due to host disconnection: {lobby.code}")
+                    print(f"Removed lobby from memory: {lobby.code}")
             else:
                 # Regular player disconnection
                 if lobby.players:  # If there are still players left
@@ -416,7 +494,7 @@ async def cleanup_user(websocket):
         del USERS[websocket]
         print(f"Cleaned up user data for: {websocket.remote_address}")
 
-def create_game(user: User, group_id):
+def create_game(user: User, group_id, game_type):
     game_code = generate_unique_game_code(6)
     write_result, doc_ref = db.collection("games").add({
         "host": user.user_id, 
@@ -424,7 +502,8 @@ def create_game(user: User, group_id):
         "group_id": group_id, 
         "active": True, 
         "game_finished": False,
-        "code": game_code
+        "code": game_code,
+        "type": game_type
     })
     if write_result:
         return game_code, doc_ref.id
@@ -466,9 +545,11 @@ async def main_handler(websocket):
 
             if user_obj["user"].teacher and "quiz" in message and not user_obj["lobby"]:
                 await websocket.send(json.dumps({"type": "creating_game", "message": "creating..."}))
-                code, game_id = create_game(user_obj["user"], message.get("group"))
+                game_type = message.get("game_type", {})
+                code, game_id = create_game(user_obj["user"], message.get("group"), game_type)
+                print(code, game_id)
                 quiz = fetch_quiz(message.get("quiz"))
-                user_obj["lobby"] = Lobby(user_obj["user"], quiz, game_id, code)
+                user_obj["lobby"] = Lobby(user_obj["user"], quiz, game_id, code, game_type)
                 LOBBIES.append(user_obj["lobby"])
                 await websocket.send(json.dumps({"type": "game_created", "message": f"done! room code: {code}", "code": code}))
                 await websocket.send(json.dumps({"type": "quiz_info", "message": f"quiz questions: {quiz['questions']}", "questions": quiz["questions"]}))
@@ -488,7 +569,13 @@ async def main_handler(websocket):
                 if target_lobby:
                     await target_lobby.connect(user_obj["user"])
                     user_obj["lobby"] = target_lobby
-                    await websocket.send(json.dumps({"type": "joined", "message": "Joined! Waiting for start"}))
+                    await websocket.send(json.dumps({
+                        "type": "joined", 
+                        "message": "Joined! Waiting for start", 
+                        "game_settings": {
+                            "mode": target_lobby.game_type.get("mode", "normal")
+                        }
+                    }))
                     print(target_lobby.quiz["title"])
                 else:
                     await websocket.send(json.dumps({"type": "error", "message": "Invalid room code!"}))
@@ -502,19 +589,143 @@ async def main_handler(websocket):
             if "show_results" in message and user_obj["lobby"].host == user_obj["user"]:
                 await user_obj["lobby"].finish_game()
 
-            print(message, user_obj)
-            print(message.get("answer"))
-            if "answer" in message and user_obj["lobby"]:
+            print(f"📨 Received message: {message}")
+            print(f"👤 User object state: auth={user_obj.get('auth')}, has_user={bool(user_obj.get('user'))}, has_lobby={bool(user_obj.get('lobby'))}")
+            
+            if "answer" in message and user_obj.get("lobby"):
                 print("saving answer")
                 await user_obj["lobby"].save_answer(user_obj["user"], message.get("answer"))
+            
+            # Handle tab switch reports
+            if "report" in message:
+                print(f"🔍 Report detected in message: {message.get('report')}")
+                
+                if not user_obj.get("lobby"):
+                    print(f"⚠️ User has no lobby")
+                elif not user_obj.get("user"):
+                    print(f"⚠️ User not authenticated")
+                elif message.get("report") != "switched_tabs":
+                    print(f"⚠️ Unknown report type: {message.get('report')}")
+                else:
+                    print(f"🚨 PROCESSING TAB SWITCH REPORT from {user_obj['user'].username}")
+                    lobby = user_obj["lobby"]
+                    user = user_obj["user"]
+                    game_mode = lobby.game_type.get("mode", "normal")
+                    print(f"🎮 Game mode: {game_mode}")
+                    
+                    if game_mode == "tab_tracking":
+                        # Track tab switches
+                        if user.user_id in lobby.tab_switches:
+                            lobby.tab_switches[user.user_id] += 1
+                        else:
+                            lobby.tab_switches[user.user_id] = 1
+                        
+                        print(f"📊 Tab switch recorded for {user.username}: {lobby.tab_switches[user.user_id]} times")
+                        
+                        # Notify host about tab switch
+                        try:
+                            await lobby.host.ws_id.send(json.dumps({
+                                "type": "tab_switch_report",
+                                "username": user.username,
+                                "user_id": user.user_id,
+                                "total_switches": lobby.tab_switches[user.user_id]
+                            }))
+                            print(f"✅ Notification sent to host")
+                        except Exception as e:
+                            print(f"❌ Error notifying host: {e}")
+                        
+                        # Acknowledge to the student
+                        try:
+                            await user.ws_id.send(json.dumps({
+                                "type": "tab_switch_recorded",
+                                "message": "Переключение вкладки зафиксировано"
+                            }))
+                            print(f"✅ Acknowledgment sent to student")
+                        except Exception as e:
+                            print(f"❌ Error acknowledging student: {e}")
+                    
+                    elif game_mode == "lockdown":
+                        # Remove player in lockdown mode
+                        print(f"🔒 LOCKDOWN VIOLATION: Removing {user.username} from game")
+                        
+                        # Notify the player they are being removed
+                        try:
+                            await user.ws_id.send(json.dumps({
+                                "type": "kicked",
+                                "reason": "lockdown_violation",
+                                "message": "Вы были удалены из игры за нарушение режима блокировки (выход из полноэкранного режима)"
+                            }))
+                        except Exception as e:
+                            print(f"❌ Error notifying kicked player: {e}")
+                        
+                        # Notify host about the violation
+                        try:
+                            await lobby.host.ws_id.send(json.dumps({
+                                "type": "player_kicked",
+                                "username": user.username,
+                                "user_id": user.user_id,
+                                "reason": "Нарушение режима блокировки"
+                            }))
+                        except Exception as e:
+                            print(f"❌ Error notifying host: {e}")
+                        
+                        # Remove from lobby
+                        if user in lobby.players:
+                            lobby.players.remove(user)
+                        if user.user_id in lobby.players_ids:
+                            lobby.players_ids.remove(user.user_id)
+                        if user.user_id in lobby.score_board:
+                            del lobby.score_board[user.user_id]
+                        if user.user_id in lobby.tab_switches:
+                            del lobby.tab_switches[user.user_id]
+                        if user.user_id in lobby.user_answers:
+                            del lobby.user_answers[user.user_id]
+                        
+                        print(f"🗑️ Removed {user.username} from lobby data structures")
+                        
+                        # Notify remaining players
+                        try:
+                            await lobby.broadcast(json.dumps({
+                                "type": "player_removed",
+                                "username": user.username,
+                                "reason": "Нарушение режима блокировки"
+                            }))
+                        except Exception as e:
+                            print(f"❌ Error broadcasting removal: {e}")
+                        
+                        # Update host's player list
+                        try:
+                            await lobby.host.ws_id.send(json.dumps({
+                                "type": "players_updated",
+                                "players": [player.username for player in lobby.players]
+                            }))
+                        except Exception as e:
+                            print(f"❌ Error updating host player list: {e}")
+                        
+                        # Close the user's connection
+                        try:
+                            await websocket.close(code=1008, reason="Lockdown mode violation")
+                            print(f"🔌 Closed websocket connection")
+                        except Exception as e:
+                            print(f"❌ Error closing websocket: {e}")
+                        
+                        # Clean up user data
+                        if websocket in USERS:
+                            del USERS[websocket]
+                            print(f"🗑️ Cleaned up user data from USERS dict")
+                    
+                    else:
+                        print(f"⚠️ Game mode '{game_mode}' does not require tracking")
 
 
 
 
     except (websockets.exceptions.ConnectionClosed, websockets.exceptions.WebSocketException, Exception) as e:
-        # Log when the client disconnects
-        print(f"Connection closed: {websocket.remote_address}, reason: {e}")
-        # Clean up user data
+        # Log when the client disconnects with error
+        print(f"Connection closed with error: {websocket.remote_address}, reason: {e}")
+    finally:
+        # Always clean up user data when connection closes (normal or error)
+        print(f"Cleaning up connection: {websocket.remote_address}")
         await cleanup_user(websocket)
 
 
