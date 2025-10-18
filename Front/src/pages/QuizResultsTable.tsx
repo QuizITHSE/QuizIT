@@ -115,7 +115,6 @@ const QuizResultsTable: React.FC = () => {
     }),
   ];
 
-  // Add tab switches column conditionally
   if (gameMode === 'tab_tracking' || gameMode === 'lockdown') {
     columns.push(
       columnHelper.accessor('tab_switches', {
@@ -230,31 +229,21 @@ const QuizResultsTable: React.FC = () => {
       }
 
       try {
-        console.log('🔍 Загружаем результаты для игры:', gameId);
         
-        // Get game data to check game mode
         const gameDoc = await getDoc(doc(db, 'games', gameId));
         if (gameDoc.exists()) {
           const gameData = gameDoc.data();
           const mode = gameData.game_mode || gameData.type?.mode || 'normal';
           setGameMode(mode as 'normal' | 'lockdown' | 'tab_tracking');
-          console.log('🎮 Режим игры:', mode);
         }
         
-        // Получаем результаты из подколлекции results для конкретной игры
         const resultsQuery = query(
           collection(db, 'games', gameId, 'results')
         );
         
         const resultsSnapshot = await getDocs(resultsQuery);
-        console.log('📊 Результаты запроса:', {
-          empty: resultsSnapshot.empty,
-          size: resultsSnapshot.size,
-          docs: resultsSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
-        });
         
         if (resultsSnapshot.empty) {
-          console.log('⚠️ Результаты не найдены для игры:', gameId);
           setError('Результаты для этой игры не найдены');
           setLoading(false);
           return;
@@ -274,27 +263,22 @@ const QuizResultsTable: React.FC = () => {
           });
         });
         
-        // Сортируем по месту (placement)
         resultsData.sort((a, b) => a.placement - b.placement);
         
-        console.log('✅ Загружены результаты:', resultsData);
         setResults(resultsData);
       } catch (error) {
-        console.error('❌ Ошибка при загрузке результатов:', error);
         setError('Ошибка при загрузке результатов');
       } finally {
         setLoading(false);
       }
     };
 
-    // Проверяем аутентификацию пользователя
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         navigate('/auth');
         return;
       }
       
-      // Проверяем, является ли пользователь учителем
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
@@ -311,10 +295,8 @@ const QuizResultsTable: React.FC = () => {
           return;
         }
         
-        // Загружаем результаты после проверки прав
         await fetchResults();
       } catch (error) {
-        console.error('Ошибка при проверке роли пользователя:', error);
         navigate('/auth');
       }
     });

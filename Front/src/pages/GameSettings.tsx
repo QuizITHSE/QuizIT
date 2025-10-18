@@ -27,49 +27,39 @@ const GameSettings: React.FC = () => {
   
   const quizId = searchParams.get('id');
 
-  // Check authentication and load data
   useEffect(() => {
     let isMounted = true;
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('🔐 GameSettings: Проверка аутентификации', user?.uid);
       
       if (!isMounted) return;
       
       if (!user) {
-        console.log('❌ GameSettings: Пользователь не авторизован');
         setLoading(false);
         navigate('/auth');
         return;
       }
 
       try {
-        // Check if quizId is provided
         if (!quizId) {
-          console.log('❌ GameSettings: Quiz ID не предоставлен');
           alert('ID квиза не указан');
           setLoading(false);
           navigate('/');
           return;
         }
 
-        // Получаем данные пользователя напрямую по UID
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
         if (!isMounted) return;
         
         if (!userDoc.exists()) {
-          console.log('❌ GameSettings: Пользователь не найден');
           alert('Ошибка: данные пользователя не найдены');
           setLoading(false);
           navigate('/');
           return;
         }
         
-        console.log('✅ GameSettings: Данные пользователя получены');
 
-        // Get quiz data
-        console.log('📝 GameSettings: Загружаем квиз:', quizId);
         const quizDocument = await getDoc(doc(db, 'quizes', quizId));
         
         if (!isMounted) return;
@@ -77,20 +67,16 @@ const GameSettings: React.FC = () => {
         if (quizDocument.exists()) {
           const quizData = quizDocument.data();
           setQuizTitle(quizData.title || 'Квиз без названия');
-          console.log('✅ GameSettings: Квиз загружен:', quizData.title);
         } else {
-          console.log('❌ GameSettings: Квиз не найден');
           alert('Квиз не найден');
           setLoading(false);
           navigate('/');
           return;
         }
 
-        // Get user's groups
-        console.log('👥 GameSettings: Загружаем классы пользователя');
         const groupsQuery = query(
           collection(db, 'groups'),
-          where('admin', '==', user.uid)  // Теперь используем UID напрямую
+          where('admin', '==', user.uid) 
         );
         const groupsSnapshot = await getDocs(groupsQuery);
         
@@ -100,7 +86,6 @@ const GameSettings: React.FC = () => {
         
         groupsSnapshot.forEach((doc) => {
           const data = doc.data();
-          console.log('📊 Group data:', { id: doc.id, name: data.name, students: data.students });
           groupsData.push({
             id: doc.id,
             name: data.name || 'Без названия',
@@ -108,11 +93,9 @@ const GameSettings: React.FC = () => {
           });
         });
 
-        console.log('✅ GameSettings: Классы загружены:', groupsData.length);
         setGroups(groupsData);
         setLoading(false);
       } catch (error) {
-        console.error('❌ GameSettings: Ошибка при загрузке данных:', error);
         if (isMounted) {
           alert('Произошла ошибка при загрузке данных: ' + (error as Error).message);
           setLoading(false);
@@ -133,7 +116,6 @@ const GameSettings: React.FC = () => {
       return;
     }
     
-    // Navigate to host page with quiz id, group id, and game mode
     navigate(`/host?id=${quizId}&group=${selectedGroup}&gameMode=${gameMode}`);
   };
 

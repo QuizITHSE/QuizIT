@@ -47,21 +47,18 @@ function CreateGroup() {
     const createGroup = async () => {
         if(groupName.length > 0){
             try {
-                // Получаем данные пользователя напрямую по UID
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                const userDoc = await getDoc(doc(db, 'users', user?.uid || ''));
                 
                 if (!userDoc.exists()) {
-                  console.error('❌ CreateGroup: Пользователь не найден');
                   alert('Ошибка: данные пользователя не найдены');
                   return;
                 }
                 
-                console.log('✅ CreateGroup: Данные пользователя получены');
                 
                 const code = await generateUniqueGroupCode(db);
                 setGroupCode(code);
                 const docRef = await addDoc(collection(db, "groups"), {
-                  admin: user.uid,  // Используем UID напрямую
+                  admin: user?.uid || '', 
                   name: groupName,
                   description: groupDescription,
                   createdAt: new Date(),
@@ -70,10 +67,8 @@ function CreateGroup() {
                   code: code,
                   students: [],
                 });
-                console.log("Document written with ID: ", docRef.id);
                 setStep(2);
               } catch (e) {
-                console.error("Error adding document: ", e);
                 alert('Ошибка при создании группы: ' + (e as Error).message);
               } 
 

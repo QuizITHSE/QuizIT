@@ -37,7 +37,6 @@ export function CopyButton({
   const copyToClipboard = async () => {
     try {
       if (!text && !html && !htmlRef?.current) {
-        console.error("No text, HTML, or HTML reference to copy")
         return
       }
 
@@ -67,7 +66,6 @@ export function CopyButton({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      console.error("Failed to copy text:", err)
     }
   }
 

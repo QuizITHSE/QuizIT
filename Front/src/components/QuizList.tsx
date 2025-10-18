@@ -3,8 +3,9 @@ import { collection, getDocs, query, where, orderBy, deleteDoc, doc } from 'fire
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Calendar, Users, Edit, Trash2, Play } from 'lucide-react';
+import { GraduationCap, Calendar, Users, Edit, Trash2, Play, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AssignHomeworkModal from './AssignHomeworkModal';
 
 interface Quiz {
   id: string;
@@ -18,6 +19,17 @@ interface Quiz {
 const QuizList: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assignHomeworkModal, setAssignHomeworkModal] = useState<{
+    isOpen: boolean;
+    quizId: string;
+    quizTitle: string;
+    totalQuestions: number;
+  }>({
+    isOpen: false,
+    quizId: '',
+    quizTitle: '',
+    totalQuestions: 0
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,7 +39,6 @@ const QuizList: React.FC = () => {
         return;
       }
       
-      console.log('User UID:', user.uid);
       
       try {
         // Получаем все квизы текущего пользователя, отсортированные по дате создания
@@ -39,7 +50,6 @@ const QuizList: React.FC = () => {
             orderBy('createdAt', 'desc')
           );
         } catch (indexError) {
-          console.log('Index error, trying without orderBy:', indexError);
           // Если индекс не настроен, делаем запрос без orderBy
           q = query(
             collection(db, 'quizes'),
@@ -50,10 +60,8 @@ const QuizList: React.FC = () => {
         const querySnapshot = await getDocs(q);
         const quizzesData: Quiz[] = [];
         
-        console.log('Query snapshot size:', querySnapshot.size);
         
         querySnapshot.forEach((doc) => {
-          console.log('Quiz doc:', doc.id, doc.data());
           quizzesData.push({
             id: doc.id,
             ...doc.data()
@@ -67,10 +75,8 @@ const QuizList: React.FC = () => {
           return dateB.getTime() - dateA.getTime();
         });
         
-        console.log('Quizzes data:', quizzesData);
         setQuizzes(quizzesData);
       } catch (error) {
-        console.error('Ошибка при загрузке квизов:', error);
       } finally {
         setLoading(false);
       }
@@ -107,9 +113,7 @@ const QuizList: React.FC = () => {
         // Обновляем локальное состояние
         setQuizzes(prevQuizzes => prevQuizzes.filter(quiz => quiz.id !== quizId));
         
-        console.log('Квиз успешно удален:', quizId);
       } catch (error) {
-        console.error('Ошибка при удалении квиза:', error);
         alert('Произошла ошибка при удалении квиза. Попробуйте еще раз.');
       }
     }
@@ -117,6 +121,24 @@ const QuizList: React.FC = () => {
 
   const handleStartQuiz = (quizId: string) => {
     navigate(`/game-settings?id=${quizId}`);
+  };
+
+  const handleAssignHomework = (quizId: string, quizTitle: string, totalQuestions: number) => {
+    setAssignHomeworkModal({
+      isOpen: true,
+      quizId,
+      quizTitle,
+      totalQuestions
+    });
+  };
+
+  const closeAssignHomeworkModal = () => {
+    setAssignHomeworkModal({
+      isOpen: false,
+      quizId: '',
+      quizTitle: '',
+      totalQuestions: 0
+    });
   };
 
   if (loading) {
@@ -173,29 +195,49 @@ const QuizList: React.FC = () => {
                   <span>Обновлен: {formatDate(quiz.updatedAt)}</span>
                 </div>
               )}
-              <div className="flex space-x-2 pt-2">
+              <div className="flex flex-col space-y-2 pt-2">
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={() => handleEditQuiz(quiz.id)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                    size="sm"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Редактировать
+                  </Button>
+                  <Button
+                    onClick={() => handleStartQuiz(quiz.id)}
+                    variant="outline"
+                    className="flex-1 cursor-pointer"
+                    size="sm"
+                  >
+                    <Play className="h-4 w-4 mr-1" />
+                    Запустить
+                  </Button>
+                </div>
                 <Button
-                  onClick={() => handleEditQuiz(quiz.id)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 cursor-pointer"
-                  size="sm"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Редактировать
-                </Button>
-                <Button
-                  onClick={() => handleStartQuiz(quiz.id)}
+                  onClick={() => handleAssignHomework(quiz.id, quiz.title || 'Без названия', quiz.questions.length)}
                   variant="outline"
-                  className="flex-1 cursor-pointer"
+                  className="w-full cursor-pointer border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300"
                   size="sm"
                 >
-                  <Play className="h-4 w-4 mr-1" />
-                  Запустить
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  Задать как ДЗ
                 </Button>
               </div>
             </div>
           </div>
         ))}
       </div>
+      
+      {/* Модальное окно назначения домашнего задания */}
+      <AssignHomeworkModal
+        isOpen={assignHomeworkModal.isOpen}
+        onClose={closeAssignHomeworkModal}
+        quizId={assignHomeworkModal.quizId}
+        quizTitle={assignHomeworkModal.quizTitle}
+        totalQuestions={assignHomeworkModal.totalQuestions}
+      />
     </div>
   );
 };

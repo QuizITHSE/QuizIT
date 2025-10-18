@@ -65,7 +65,7 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
 
         {/* Options */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {options.map((option, index) => (
+          {options && Array.isArray(options) ? options.map((option, index) => (
             <button
               key={index}
               onClick={() => !isHost && handleAnswerSelect(index)}
@@ -91,7 +91,11 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
                 <span className="text-sm font-medium text-gray-800 text-center">{option}</span>
               </div>
             </button>
-          ))}
+          )) : (
+            <div className="col-span-2 text-center text-gray-500 p-8">
+              Нет доступных вариантов ответа
+            </div>
+          )}
         </div>
 
         {/* Submit Button - Only show for students */}

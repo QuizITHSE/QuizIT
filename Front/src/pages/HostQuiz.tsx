@@ -66,7 +66,6 @@ const HostQuiz: React.FC = () => {
   const [isTeacher, setIsTeacher] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // WebSocket states
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
   const [gameCode, setGameCode] = useState<string | null>(null);
@@ -86,13 +85,10 @@ const HostQuiz: React.FC = () => {
   const groupId = searchParams.get('group');
   const gameMode = searchParams.get('gameMode') || 'normal';
 
-  // WebSocket connection
   useEffect(() => {
-    console.log('🔌 Подключаемся к WebSocket серверу...');
     const websocket = new WebSocket('ws://localhost:8765');
     
     websocket.onopen = () => {
-      console.log('✅ WebSocket подключен');
       setWsConnected(true);
       setWs(websocket);
     };
@@ -100,91 +96,71 @@ const HostQuiz: React.FC = () => {
     websocket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('📥 Получено сообщение:', message);
         
-        // Проверяем, есть ли ключ players в сообщении
         if (message.players !== undefined) {
-          console.log('👥 Список игроков:', message);
           setPlayers(message.players || []);
           return;
         }
         
-        // Проверяем, есть ли ключ question в сообщении
         if (message.question !== undefined) {
-          console.log('❓ Получен вопрос:', message);
           setCurrentQuestion(message);
           setTimeLeft(message.timeLimit || 60);
           setTimerActive(true);
-          setCurrentQuestionNumber(prev => prev + 1); // Увеличиваем счетчик вопросов
+          setCurrentQuestionNumber(prev => prev + 1); 
           return;
         }
         
-        // Обрабатываем сообщения с типом
         switch (message.type) {
           case 'welcome':
-            console.log('👋 Приветствие от сервера:', message.message);
             break;
             
           case 'auth_attempt':
-            console.log('🔐 Попытка аутентификации:', message.message);
             break;
             
           case 'auth_success':
-            console.log('✅ Аутентификация успешна:', message.message);
             setAuthSuccess(true);
             break;
             
           case 'game_created':
-            console.log('🎮 Игра создана:', message);
-            console.log('🔑 Код игры:', message.code);
             setGameCode(message.code);
             break;
             
           case 'quiz_info':
-            console.log('📋 Информация о квизе:', message);
             break;
             
           case 'creating_game':
-            console.log('🎮 Создание игры:', message.message);
             break;
             
           case 'round_results':
-            console.log('📊 Результаты раунда:', message);
             setRoundResults(message.data);
-            setCurrentQuestion(null); // Скрываем вопрос при показе результатов
-            setTimerActive(false); // Останавливаем таймер
+            setCurrentQuestion(null); 
+            setTimerActive(false); 
             break;
             
           case 'game_finished':
-            console.log('🏁 Игра завершена:', message);
             setGameResults({
               leaderboard: message.leaderboard || [],
               total_questions: message.total_questions || 0,
               total_players: message.total_players || 0
             });
-            setCurrentQuestion(null); // Скрываем вопрос
-            setRoundResults(null); // Скрываем результаты раунда
-            setTimerActive(false); // Останавливаем таймер
+            setCurrentQuestion(null); 
+            setRoundResults(null); 
+            setTimerActive(false); 
             break;
             
           case 'last_question_completed':
-            console.log('🔚 Последний вопрос завершен:', message.message);
             break;
             
           case 'answers':
-            console.log('📝 Количество ответов:', message);
             break;
             
           default:
-            console.log('❓ Неизвестный тип сообщения:', message.type);
         }
       } catch (error) {
-        console.error('❌ Ошибка парсинга сообщения:', error);
       }
     };
 
     websocket.onclose = (event) => {
-      console.log('❌ WebSocket отключен:', event.code, event.reason);
       setWsConnected(false);
       setWs(null);
       setAuthSent(false);
@@ -201,52 +177,39 @@ const HostQuiz: React.FC = () => {
     };
 
     websocket.onerror = (error) => {
-      console.error('❌ Ошибка WebSocket:', error);
       setWsConnected(false);
     };
 
     return () => {
-      console.log('🔌 Закрываем WebSocket соединение');
       websocket.close();
     };
   }, []);
 
-  // Send auth message when connected and user is authenticated
   useEffect(() => {
     const sendAuthMessage = async () => {
       if (wsConnected && ws && !authSent) {
-        console.log('🔐 Проверяем аутентификацию пользователя...');
         
-        // Wait for auth state to be ready
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
           if (user) {
-            console.log('✅ Пользователь аутентифицирован, отправляем UID...');
             
             try {
-              // Проверяем, что пользователь существует
               const userDoc = await getDoc(doc(db, 'users', user.uid));
               
               if (!userDoc.exists()) {
-                console.error('❌ User document not found for UID:', user.uid);
                 unsubscribe();
                 return;
               }
               
-              console.log('✅ User document found, sending UID:', user.uid);
               
-              // Send auth message with the UID directly
               const authMessage = { user_id: user.uid };
-              console.log('📤 Отправляем AUTH:', authMessage);
               ws.send(JSON.stringify(authMessage));
               setAuthSent(true);
               unsubscribe(); // Clean up the listener
               
             } catch (error) {
-              console.error('❌ Ошибка при проверке user document:', error);
               unsubscribe();
             }
           } else {
-            console.error('❌ Пользователь не аутентифицирован');
             unsubscribe(); // Clean up the listener
           }
         });
@@ -256,10 +219,8 @@ const HostQuiz: React.FC = () => {
     sendAuthMessage();
   }, [wsConnected, ws, authSent]);
 
-  // Send create quiz message when quiz is loaded AND auth is successful
   useEffect(() => {
     if (wsConnected && ws && quiz && quizId && groupId && authSuccess && !quizCreated) {
-      console.log('🎮 Отправляем сообщение создания квиза...');
       const createQuizMessage = {
         quiz: quizId, 
         group: groupId, 
@@ -267,13 +228,11 @@ const HostQuiz: React.FC = () => {
           mode: gameMode
         }
       };
-      console.log('📤 Отправляем CREATE_QUIZ:', createQuizMessage);
       ws.send(JSON.stringify(createQuizMessage));
       setQuizCreated(true);
     }
   }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated, gameMode]);
 
-  // Timer countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (timerActive && timeLeft > 0) {
@@ -281,45 +240,35 @@ const HostQuiz: React.FC = () => {
         setTimeLeft((prevTime) => prevTime - 1);
       }, 1000);
     } else if (timeLeft === 0 && timerActive) {
-      console.log('⏰ Время вышло!');
       setTimerActive(false);
     }
     return () => clearInterval(interval);
   }, [timerActive, timeLeft]);
 
-  // Function to start the quiz
   const startQuiz = () => {
     if (ws && !quizStarted) {
-      console.log('🚀 Начинаем квиз...');
       const startMessage = { start: true };
-      console.log('📤 Отправляем START:', startMessage);
       ws.send(JSON.stringify(startMessage));
       setQuizStarted(true);
     }
   };
 
-  // Function to go to next question or show final results
   const nextQuestion = () => {
     if (ws) {
       const isLastQuestion = currentQuestionNumber >= questions.length;
       
       if (isLastQuestion) {
-        console.log('🏁 Показываем финальные результаты...');
         const showResultsMessage = { show_results: true };
-        console.log('📤 Отправляем SHOW_RESULTS:', showResultsMessage);
         ws.send(JSON.stringify(showResultsMessage));
       } else {
-        console.log('➡️ Переходим к следующему вопросу...');
         const nextMessage = { next: true };
-        console.log('📤 Отправляем NEXT:', nextMessage);
         ws.send(JSON.stringify(nextMessage));
       }
       
-      setRoundResults(null); // Скрываем результаты
+      setRoundResults(null);
     }
   };
 
-  // Check user authentication and role
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -327,7 +276,6 @@ const HostQuiz: React.FC = () => {
         return;
       }
 
-      // Check if user is teacher
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
@@ -345,12 +293,10 @@ const HostQuiz: React.FC = () => {
           return;
         }
       } catch (error) {
-        console.error('Ошибка при проверке роли пользователя:', error);
         navigate('/auth');
         return;
       }
 
-      // Load quiz
       if (quizId) {
         await loadQuiz(quizId, user.uid);
       }
@@ -363,7 +309,6 @@ const HostQuiz: React.FC = () => {
 
   const loadQuiz = async (id: string, userId: string) => {
     try {
-      // Get quiz data
       const quizDoc = await getDoc(doc(db, 'quizes', id));
       if (!quizDoc.exists()) {
         alert('Квиз не найден');
@@ -373,7 +318,6 @@ const HostQuiz: React.FC = () => {
 
       const quizData = quizDoc.data() as Quiz;
       
-      // Check if quiz belongs to current user
       if (quizData.owner !== userId) {
         alert('У вас нет прав для проведения этого квиза');
         navigate('/');
@@ -382,7 +326,6 @@ const HostQuiz: React.FC = () => {
 
       setQuiz({ ...quizData, id });
 
-      // Load questions
       if (quizData.questions && quizData.questions.length > 0) {
         const loadedQuestions: Question[] = [];
         
@@ -402,14 +345,12 @@ const HostQuiz: React.FC = () => {
               });
             }
           } catch (error) {
-            console.error(`Ошибка при загрузке вопроса ${questionId}:`, error);
           }
         }
         
         setQuestions(loadedQuestions);
       }
     } catch (error) {
-      console.error('Ошибка при загрузке квиза:', error);
       alert('Ошибка при загрузке квиза');
       navigate('/');
     }
