@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-//import { Spinner } from '@/components/ui/spinner';
 import { GraduationCap, Check,  Circle, Trash2 } from 'lucide-react'
 import { produce } from "immer";
 import { auth, db } from '@/lib/firebase';
@@ -35,7 +34,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// Компонент для перетаскиваемого элемента вопроса
 const SortableQuestionItem = ({ question, index, isActive, onClick, onDelete, canDelete }: { 
     question: any, 
     index: number, 
@@ -54,8 +52,8 @@ const SortableQuestionItem = ({ question, index, isActive, onClick, onDelete, ca
     } = useSortable({ 
         id: index,
         transition: {
-            duration: 150, // Более быстрые переходы
-            easing: 'cubic-bezier(0.25, 1, 0.5, 1)', // Плавная кривая
+            duration: 150,
+            easing: 'cubic-bezier(0.25, 1, 0.5, 1)', 
         },
     });
 
@@ -132,25 +130,19 @@ const CreateQuiz = () => {
         const id = searchParams.get('id');
         if (id) {
             setQuizDocId(id);
-            console.log('Quiz ID:', id);
             
-            // Получаем существующую викторину из Firestore
             const fetchQuiz = async () => {
                 try {
                     const quizDoc = await getDoc(doc(db, "quizes", id));
                     if (quizDoc.exists()) {
                         const quizData = quizDoc.data();
-                        console.log('Fetched quiz:', quizData);
                         
-                        // Загружаем название квиза
                         setQuizTitle(quizData.title || "");
                         
-                        // Если есть вопросы, загружаем их из коллекции "questions"
                         if (quizData.questions && quizData.questions.length > 0) {
                             const questionIds = quizData.questions;
                             const loadedQuestions = [];
                             
-                            // Загружаем каждый вопрос по его id
                             for (const questionId of questionIds) {
                                 try {
                                     const questionDoc = await getDoc(doc(db, "questions", questionId));
@@ -167,21 +159,16 @@ const CreateQuiz = () => {
                                         });
                                     }
                                 } catch (error) {
-                                    console.error(`Error loading question ${questionId}:`, error);
                                 }
                             }
                             
-                            // Обновляем состояние с загруженными вопросами
                             if (loadedQuestions.length > 0) {
                                 setQuiz(loadedQuestions);
-                                console.log('Loaded questions:', loadedQuestions);
                             }
                         }
                     } else {
-                        console.log('Quiz not found');
                     }
                 } catch (error) {
-                    console.error('Error fetching quiz:', error);
                 }
             };
             
@@ -191,7 +178,6 @@ const CreateQuiz = () => {
     }, [searchParams]);
 
     useEffect(() => {
-        console.log(quiz)
     }, [quiz])
 
     const updateQuestionText = (newText: string) => {
@@ -216,17 +202,14 @@ const CreateQuiz = () => {
 
     const saveQuiz = async () => {
         setSavingText("Сохраняется...")
-        console.log("Saving quiz...");
         
         try {
             const questionIds: string[] = [];
             
-            // Обрабатываем каждый вопрос
             for (let i = 0; i < quiz.length; i++) {
                 const question = quiz[i];
                 
                 if (!question.id || question.id === "" || question.id === i.toString()) {
-                    // Создаем новый документ для вопроса без настоящего id
                     const newQuestion = {
                         question: question.question,
                         options: question.options,
@@ -239,14 +222,12 @@ const CreateQuiz = () => {
                     const docRef = await addDoc(collection(db, "questions"), newQuestion);
                     questionIds.push(docRef.id);
                     
-                    // Обновляем локальный id
                     setQuiz((prev) =>
                         produce(prev, (draft) => {
                             draft[i].id = docRef.id;
                         })
                     );
                 } else {
-                    // Обновляем существующий вопрос с настоящим id
                     await updateDoc(doc(db, "questions", question.id), {
                         question: question.question,
                         options: question.options,
@@ -259,7 +240,6 @@ const CreateQuiz = () => {
                 }
             }
             
-            // Обновляем документ викторины с массивом id вопросов
             if (quizDocId) {
                 await updateDoc(doc(db, "quizes", quizDocId), {
                     title: quizTitle,
@@ -268,11 +248,8 @@ const CreateQuiz = () => {
                 });
             }
             
-            console.log("Quiz saved successfully!");
-            console.log("Question IDs:", questionIds);
             
         } catch (error) {
-            console.error("Error saving quiz:", error);
         } finally {
             setSavingText("Сохранить")
         }
@@ -288,10 +265,8 @@ const CreateQuiz = () => {
                 const correctIndex = currentQuestion.correct.indexOf(optionIndex);
                 
                 if (currentQuestion.type === "single") {
-                    // Для одного правильного ответа - очищаем все и выбираем новый
                     currentQuestion.correct = [optionIndex];
                 } else if (currentQuestion.type === "multiple") {
-                    // Для множественного выбора - добавляем/убираем как раньше
                     if (correctIndex === -1) {
                         currentQuestion.correct.push(optionIndex);
                     } else {
@@ -354,12 +329,10 @@ const CreateQuiz = () => {
     const deleteQuestion = async (questionIndex: number) => {
         if (quiz.length > 1) {
             const questionId = quiz[questionIndex].id;
-            // Удаляем вопрос из Firestore, если у него есть id
             if (questionId) {
                 try {
                     await deleteDoc(doc(db, "questions", questionId));
                 } catch (error) {
-                    console.error("Ошибка при удалении вопроса из Firebase:", error);
                 }
             }
 
@@ -369,7 +342,6 @@ const CreateQuiz = () => {
                 })
             );
             
-            // Обновляем индекс если удаляемый вопрос был активным или после него
             if (questionIndex === index) {
                 setIndex(Math.max(0, index - 1));
             } else if (questionIndex < index) {
@@ -407,7 +379,6 @@ const CreateQuiz = () => {
                 })
             );
             
-            // Обновляем индекс если перетаскиваемый элемент был активным
             if (index === oldIndex) {
                 setIndex(newIndex);
             } else if (index > oldIndex && index <= newIndex) {

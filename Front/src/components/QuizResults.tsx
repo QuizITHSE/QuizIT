@@ -38,35 +38,26 @@ const QuizResults: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('🚀 QuizResults component mounted, setting up auth listener...');
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        console.log('👤 No authenticated user found');
         setLoading(false);
         return;
       }
       
       try {
-        console.log('🔍 Starting QuizResults query process...');
-        console.log('👤 Current user UID:', user.uid);
         
         // Get user data directly by UID
-        console.log('📋 Getting user document by UID:', user.uid);
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
-        console.log('📊 User document exists:', userDoc.exists());
         
         if (!userDoc.exists()) {
-          console.error('❌ User document not found for UID:', user.uid);
           setLoading(false);
           return;
         }
         
         const userData = userDoc.data();
-        console.log('👤 User data:', userData);
         
         // Now fetch all finished games for the current user as host using the UID directly
-        console.log('🎮 Querying games collection for host:', user.uid);
         const q = query(
           collection(db, 'games'),
           where('host', '==', user.uid),
@@ -75,11 +66,6 @@ const QuizResults: React.FC = () => {
         );
         
         const querySnapshot = await getDocs(q);
-        console.log('🎯 Games query results:', {
-          empty: querySnapshot.empty,
-          size: querySnapshot.size,
-          docs: querySnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
-        });
         
         const gamesData: Game[] = [];
         
@@ -88,33 +74,24 @@ const QuizResults: React.FC = () => {
             id: doc.id,
             ...doc.data()
           } as Game;
-          console.log('📝 Processing game:', gameData);
           gamesData.push(gameData);
         });
         
-        console.log('🎉 Final games data:', gamesData);
         setGames(gamesData);
       } catch (error) {
-        console.error('❌ Error fetching games:', error);
-        console.log('🔄 Trying fallback query without orderBy...');
         // Try without orderBy if index is not set up
         try {
           // Get user data directly by UID (fallback)
-          console.log('📋 Fallback: Getting user document by UID:', user.uid);
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           
-          console.log('📊 Fallback: User document exists:', userDoc.exists());
           
           if (!userDoc.exists()) {
-            console.error('❌ Fallback: User document not found for UID:', user.uid);
             setLoading(false);
             return;
           }
           
           const userData = userDoc.data();
-          console.log('👤 Fallback: User data:', userData);
           
-          console.log('🎮 Fallback: Querying games collection for host:', user.uid);
           const q = query(
             collection(db, 'games'),
             where('host', '==', user.uid),
@@ -122,11 +99,6 @@ const QuizResults: React.FC = () => {
           );
           
           const querySnapshot = await getDocs(q);
-          console.log('🎯 Fallback games query results:', {
-            empty: querySnapshot.empty,
-            size: querySnapshot.size,
-            docs: querySnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }))
-          });
           
           const gamesData: Game[] = [];
           
@@ -135,31 +107,25 @@ const QuizResults: React.FC = () => {
               id: doc.id,
               ...doc.data()
             } as Game;
-            console.log('📝 Fallback: Processing game:', gameData);
             gamesData.push(gameData);
           });
           
           // Sort locally by finished_at
-          console.log('🔄 Sorting games locally by finished_at...');
           gamesData.sort((a, b) => {
             const dateA = a.finished_at?.toDate ? a.finished_at.toDate() : new Date(a.finished_at);
             const dateB = b.finished_at?.toDate ? b.finished_at.toDate() : new Date(b.finished_at);
             return dateB.getTime() - dateA.getTime();
           });
           
-          console.log('🎉 Fallback: Final games data:', gamesData);
           setGames(gamesData);
         } catch (fallbackError) {
-          console.error('❌ Error fetching games (fallback):', fallbackError);
         }
       } finally {
-        console.log('🏁 QuizResults query process completed');
         setLoading(false);
       }
     });
 
     return () => {
-      console.log('🧹 QuizResults component unmounting, cleaning up auth listener...');
       unsubscribe();
     };
   }, []);

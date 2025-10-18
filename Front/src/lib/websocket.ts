@@ -20,25 +20,21 @@ class WebSocketManager {
     return new Promise((resolve, reject) => {
       // Предотвращаем множественные подключения
       if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
-        console.log('⚠️ WebSocket уже подключается, пропускаем повторное подключение');
         resolve();
         return;
       }
 
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        console.log('✅ WebSocket уже подключен');
         resolve();
         return;
       }
 
       this.isConnecting = true;
-      console.log('🔌 Начинаем подключение к WebSocket:', url);
       
       try {
         this.ws = new WebSocket(url);
         
         this.ws.onopen = () => {
-          console.log('✅ WebSocket подключен');
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           resolve();
@@ -47,35 +43,24 @@ class WebSocketManager {
         this.ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('📥 ПОЛУЧЕНО WebSocket сообщение:', {
-              type: message.type,
-              timestamp: new Date().toISOString(),
-              rawData: event.data,
-              parsedMessage: message
-            });
             
             // Вызываем обработчики для конкретных типов сообщений
             const handler = this.listeners.get(message.type);
             if (handler) {
-              console.log(`🎯 Вызываем обработчик для типа "${message.type}"`);
               // Передаем все сообщение, а не только data
               handler(message);
             } else {
-              console.log(`⚠️ Нет обработчика для типа "${message.type}"`);
             }
           } catch (error) {
-            console.error('❌ Ошибка при парсинге сообщения:', error, 'Raw data:', event.data);
           }
         };
 
         this.ws.onclose = (event) => {
-          console.log('❌ WebSocket отключен:', event.code, event.reason);
           this.isConnecting = false;
           this.attemptReconnect(url);
         };
 
         this.ws.onerror = (error) => {
-          console.error('❌ Ошибка WebSocket:', error);
           this.isConnecting = false;
           reject(error);
         };
@@ -88,30 +73,20 @@ class WebSocketManager {
   private attemptReconnect(url: string) {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`🔄 Попытка переподключения ${this.reconnectAttempts}/${this.maxReconnectAttempts} через ${this.reconnectInterval}ms`);
       
       setTimeout(() => {
         if (!this.isConnecting && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
-          this.connect(url).catch(console.error);
         }
       }, this.reconnectInterval);
     } else {
-      console.error('❌ Превышено максимальное количество попыток переподключения');
     }
   }
 
   send(type: string, data: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const message = { type, data };
-      console.log('📤 ОТПРАВКА WebSocket сообщения:', {
-        type: message.type,
-        data: message.data,
-        timestamp: new Date().toISOString(),
-        fullMessage: message
-      });
       this.ws.send(JSON.stringify(message));
     } else {
-      console.error('❌ WebSocket не подключен, не могу отправить сообщение:', { type, data });
     }
   }
 
@@ -120,7 +95,6 @@ class WebSocketManager {
   }
 
   disconnect() {
-    console.log('🔌 Принудительное отключение WebSocket');
     this.isConnecting = false;
     this.reconnectAttempts = this.maxReconnectAttempts; // Предотвращаем переподключение
     if (this.ws) {
@@ -153,7 +127,6 @@ export const useWebSocket = (url: string) => {
       } catch (err) {
         setError('Ошибка подключения к WebSocket');
         setIsConnected(false);
-        console.error('Ошибка подключения:', err);
       }
     };
 

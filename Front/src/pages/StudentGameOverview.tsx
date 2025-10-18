@@ -51,7 +51,6 @@ const StudentGameOverview: React.FC = () => {
       }
 
       try {
-        // Check if user is student
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
         if (!userDoc.exists()) {
@@ -67,9 +66,7 @@ const StudentGameOverview: React.FC = () => {
           return;
         }
 
-        console.log('🔍 Ищем игры для студента:', user.uid);
         
-        // Find all games where user is in players array
         const gamesQuery = query(
           collection(db, 'games'),
           where('players', 'array-contains', user.uid),
@@ -77,7 +74,6 @@ const StudentGameOverview: React.FC = () => {
         );
         
         const gamesSnapshot = await getDocs(gamesQuery);
-        console.log('📊 Найдено игр:', gamesSnapshot.size);
         
         const userResults: UserGameResult[] = [];
         
@@ -85,9 +81,7 @@ const StudentGameOverview: React.FC = () => {
           const gameData = gameDoc.data();
           const gameId = gameDoc.id;
           
-          console.log('🎮 Обрабатываем игру:', gameId);
           
-          // Get user's specific results from subcollection
           try {
             const userResultDoc = await getDoc(
               doc(db, 'games', gameId, 'results', user.uid)
@@ -95,7 +89,6 @@ const StudentGameOverview: React.FC = () => {
             
             if (userResultDoc.exists()) {
               const resultData = userResultDoc.data();
-              console.log('✅ Результаты найдены для игры:', gameId);
               
               userResults.push({
                 gameId: gameId,
@@ -115,21 +108,17 @@ const StudentGameOverview: React.FC = () => {
               });
             }
           } catch (error) {
-            console.error('Ошибка при загрузке результатов для игры:', gameId, error);
           }
         }
         
-        // Sort by finished_at (most recent first)
         userResults.sort((a, b) => {
           const dateA = a.finished_at?.toDate ? a.finished_at.toDate() : new Date(a.finished_at || 0);
           const dateB = b.finished_at?.toDate ? b.finished_at.toDate() : new Date(b.finished_at || 0);
           return dateB.getTime() - dateA.getTime();
         });
         
-        console.log('🎉 Загружено результатов:', userResults.length);
         setResults(userResults);
       } catch (error) {
-        console.error('❌ Ошибка при загрузке данных:', error);
       } finally {
         setLoading(false);
       }
@@ -394,15 +383,12 @@ const StudentGameOverview: React.FC = () => {
                           let icon = null;
                           
                           if (isCorrectAnswer && isUserAnswer) {
-                            // User selected correct answer
                             bgColor = 'bg-green-100 border-green-300';
                             icon = <CheckCircle className="h-4 w-4 text-green-600" />;
                           } else if (isCorrectAnswer && !isUserAnswer) {
-                            // Correct answer but user didn't select it
                             bgColor = 'bg-green-50 border-green-200';
                             icon = <CheckCircle className="h-4 w-4 text-green-500" />;
                           } else if (!isCorrectAnswer && isUserAnswer) {
-                            // User selected wrong answer
                             bgColor = 'bg-red-100 border-red-300';
                             icon = <XCircle className="h-4 w-4 text-red-600" />;
                           }

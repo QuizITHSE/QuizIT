@@ -38,18 +38,14 @@ function Auth() {
     const analytics = getAnalytics(app);
 
 
-    // Состояние для активной вкладки
     const [activeTab, setActiveTab] = React.useState<'login' | 'signup'>('login');
-    // refs для контента вкладок
     const loginRef = useRef<HTMLDivElement>(null);
     const signupRef = useRef<HTMLDivElement>(null);
-    // ref для контейнера
     const containerRef = useRef<HTMLDivElement>(null);
 
     const usersCollection = collection(db, 'users');
 
 
-    // Состояния для регистрации
     const [regStep, setRegStep] = React.useState<number>(0);
     const [regButtonText, setRegButtonText] = React.useState<string>("Далее");
     const [regError, setRegError] = React.useState<string | null>(null);
@@ -60,7 +56,6 @@ function Auth() {
 
     const [userCreds, setUserCreds] = React.useState<any>(null);
 
-    // react-hook-form для логина
     const loginForm = useForm({
         defaultValues: {
             email: "",
@@ -68,7 +63,6 @@ function Auth() {
         }
     });
 
-    // react-hook-form для регистрации
     const signupForm = useForm({
         defaultValues: {
             firstName: "",
@@ -79,29 +73,17 @@ function Auth() {
         }
     });
 
-    // Логика логина
     const handleLogin = async (values: { email: string, password: string }) => {
         setIsLoggingIn(true);
         
-        // Отладка: проверяем данные перед отправкой
-        console.log("Попытка входа с данными:");
-        console.log("Email:", `"${values.email}"`);
-        console.log("Password length:", values.password.length);
-        console.log("Password (первые 3 символа):", values.password.substring(0, 3) + "***");
         
         try {
             const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth");
             const auth = getAuth();
             
             await signInWithEmailAndPassword(auth, values.email.trim(), values.password);
-            console.log("Успешный вход:", values.email);
             navigate("/");
     } catch (error: any) {
-        console.error("Ошибка входа:", error);
-        console.error("Код ошибки:", error.code);
-        console.error("Сообщение ошибки:", error.message);
-        console.error("Email для входа:", values.email);
-        console.error("Длина пароля:", values.password.length);
         if (error.code === "auth/user-not-found") {
                 loginForm.setError("email", { message: "Пользователь с такой почтой не найден" });
             } else if (error.code === "auth/wrong-password") {
@@ -124,7 +106,6 @@ function Auth() {
         }
     }
 
-    // Логика регистрации
     const handleSignup = async (values: { firstName: string, lastName: string, email: string, password: string, passwordRepeat: string }) => {
         setRegError(null);
         if (values.password !== values.passwordRepeat) {
@@ -134,12 +115,10 @@ function Auth() {
 
         setIsCreatingAccount(true);
 
-        // Проверка, существует ли пользователь с такой почтой в Firebase Auth
         try {
             const { getAuth, fetchSignInMethodsForEmail, createUserWithEmailAndPassword } = await import("firebase/auth");
             const auth = getAuth();
 
-            // Проверяем, есть ли уже пользователь с такой почтой
             const methods = await fetchSignInMethodsForEmail(auth, values.email);
             if (methods.length > 0) {
                 setRegError("Пользователь с такой почтой уже существует");
@@ -147,14 +126,12 @@ function Auth() {
                 return;
             }
 
-            // Если пользователя нет, создаём его
             await createUserWithEmailAndPassword(auth, values.email, values.password);
             setUserCreds(auth.currentUser);
 
             setRegStep(1);
             setRegButtonText("Готово");
             setIsCreatingAccount(false);
-            console.log("Регистрация:", values);
         } catch (error: any) {
             setIsCreatingAccount(false);
             if (error.code === "auth/email-already-in-use") {
@@ -171,10 +148,8 @@ function Auth() {
         }
     }
 
-    // Сохраняем выбранный тип пользователя
     const [userType, setUserType] = React.useState<"student" | "teacher">("student");
 
-    // Обработчик изменения выбора в RadioGroup
     const handleUserTypeChange = (value: string) => {
         setSelectedOption(value);
         if (value === "option-one") {
@@ -184,21 +159,17 @@ function Auth() {
         }
     };
 
-    // Состояние для выбранного значения RadioGroup
     const [selectedOption, setSelectedOption] = React.useState("option-one");
     const [isUserCreating, setIsUserCreating] = React.useState(false);
 
     const saveUserType = async () => {
         setIsUserCreating(true);
-        console.log("Выбранный тип пользователя:", userType);
         try {
-            // Используем UID как document ID
             await setDoc(doc(db, "users", userCreds.uid), {
               isTeacher: userType === "teacher" ? true : false,
               name: signupForm.getValues("firstName"),
               lastName: signupForm.getValues("lastName"),
             });
-            console.log("Document written with ID: ", userCreds.uid);
             if(userType === "teacher"){ 
                 navigate("/create-group")
             } else {
@@ -206,13 +177,11 @@ function Auth() {
             }
             setIsUserCreating(false);
           } catch (e) {
-            console.error("Error adding document: ", e);
             setIsUserCreating(false);
           } 
     }
     
 
-    // Эффект для динамического изменения высоты контейнера
     useLayoutEffect(() => {
         let node: HTMLDivElement | null = null;
         if (activeTab === 'login') {

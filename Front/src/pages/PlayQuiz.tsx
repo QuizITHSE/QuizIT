@@ -21,7 +21,6 @@ const PlayQuiz: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isStudent, setIsStudent] = useState(false);
   
-  // WebSocket states
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
   const [authSent, setAuthSent] = useState(false);
@@ -52,13 +51,10 @@ const PlayQuiz: React.FC = () => {
 
   const gameCodeParam = searchParams.get('code');
 
-  // WebSocket connection
   useEffect(() => {
-    console.log('🔌 Подключаемся к WebSocket серверу...');
     const websocket = new WebSocket('ws://localhost:8765');
     
     websocket.onopen = () => {
-      console.log('✅ WebSocket подключен');
       setWsConnected(true);
       setWs(websocket);
     };
@@ -66,62 +62,47 @@ const PlayQuiz: React.FC = () => {
     websocket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('📥 Получено сообщение:', message);
         
-        // Проверяем, есть ли ключ question в сообщении
         if (message.question !== undefined) {
-          console.log('❓ Получен вопрос:', message);
           setCurrentQuestion(message);
           setTimeLeft(message.timeLimit || 60);
           setTimerActive(true);
-          setRoundResult(null); // Сбрасываем результат предыдущего раунда
+          setRoundResult(null); 
           return;
         }
         
-        // Обрабатываем сообщения с типом
         switch (message.type) {
           case 'welcome':
-            console.log('👋 Приветствие от сервера:', message.message);
             break;
             
           case 'auth_attempt':
-            console.log('🔐 Попытка аутентификации:', message.message);
             break;
             
           case 'auth_success':
-            console.log('✅ Аутентификация успешна:', message.message);
             setAuthSuccess(true);
             break;
             
           case 'joined':
-            console.log('🎮 Присоединился к игре:', message);
             setGameJoined(true);
-            // Get game mode from settings
             if (message.game_settings?.mode) {
               setGameMode(message.game_settings.mode);
-              console.log('🎮 Режим игры:', message.game_settings.mode);
             }
             break;
             
           case 'game_joined':
-            console.log('🎮 Игра присоединена:', message.message);
             setGameJoined(true);
             break;
             
           case 'game_not_found':
-            console.log('❌ Игра не найдена:', message.message);
             alert('Игра с таким кодом не найдена');
             break;
             
           case 'round_ended':
-            console.log('🏁 Раунд завершен:', message);
-            // Находим позицию текущего игрока в scoreboard
             let placement: number | undefined;
             if (message.scoreboard) {
               const sortedPlayers = Object.entries(message.scoreboard)
                 .sort(([,a], [,b]) => ((b as [string, number])[1]) - ((a as [string, number])[1]));
               
-              // Находим позицию текущего игрока (предполагаем, что playerName совпадает с именем в scoreboard)
               const playerEntry = sortedPlayers.find(([, playerData]) => 
                 ((playerData as [string, number])[0]) === playerName
               );
@@ -143,7 +124,6 @@ const PlayQuiz: React.FC = () => {
             break;
             
           case 'game_finished':
-            console.log('🏁 Игра завершена:', message);
             setGameFinished({
               placement: message.placement,
               score: message.score,
@@ -155,7 +135,6 @@ const PlayQuiz: React.FC = () => {
             break;
             
           case 'kicked':
-            console.log('🚫 Вы были удалены из игры:', message);
             setIsKicked(true);
             setKickReason(message.message || 'Вы были удалены из игры');
             setCurrentQuestion(null);
@@ -164,23 +143,18 @@ const PlayQuiz: React.FC = () => {
             break;
             
           case 'tab_switch_recorded':
-            console.log('📊 Переключение вкладки зафиксировано:', message.message);
             break;
             
           case 'player_removed':
-            console.log('🚫 Игрок удален:', message);
             break;
             
           default:
-            console.log('❓ Неизвестный тип сообщения:', message.type);
         }
       } catch (error) {
-        console.error('❌ Ошибка парсинга сообщения:', error);
       }
     };
 
     websocket.onclose = (event) => {
-      console.log('❌ WebSocket отключен:', event.code, event.reason);
       setWsConnected(false);
       setWs(null);
       setAuthSent(false);
@@ -192,64 +166,46 @@ const PlayQuiz: React.FC = () => {
     };
 
     websocket.onerror = (error) => {
-      console.error('❌ Ошибка WebSocket:', error);
       setWsConnected(false);
     };
 
     return () => {
-      console.log('🔌 Закрываем WebSocket соединение');
       websocket.close();
     };
   }, []);
 
-  // Send auth message when connected
   useEffect(() => {
     if (wsConnected && ws && !authSent && userUid) {
-      console.log('🔐 Отправляем сообщение аутентификации...');
       const authMessage = { user_id: userUid };
-      console.log('📤 Отправляем AUTH:', authMessage);
       ws.send(JSON.stringify(authMessage));
       setAuthSent(true);
     }
   }, [wsConnected, ws, authSent, userUid]);
 
-  // Join game when auth is successful and game code is provided
   useEffect(() => {
     const codeToUse = gameCode || gameCodeParam;
     if (wsConnected && ws && authSuccess && codeToUse && !gameJoined) {
-      console.log('🎮 Присоединяемся к игре...');
       const joinMessage = { 
         code: codeToUse
       };
-      console.log('📤 Отправляем JOIN_GAME:', joinMessage);
       ws.send(JSON.stringify(joinMessage));
       setGameJoined(true);
     }
   }, [wsConnected, ws, authSuccess, gameCode, gameCodeParam, gameJoined, playerName]);
 
-  // Function to report cheating attempt (useCallback to avoid recreating in useEffect)
   const reportCheating = useCallback(() => {
     if (ws && ws.readyState === WebSocket.OPEN && gameJoined) {
-      console.log('🚨 Отправляем отчет о переключении вкладки');
       const reportMessage = { 
         report: "switched_tabs"
       };
       try {
         ws.send(JSON.stringify(reportMessage));
-        console.log('✅ Отчет о нарушении отправлен');
       } catch (error) {
-        console.error('❌ Ошибка при отправке отчета:', error);
       }
     } else {
-      console.log('⚠️ WebSocket не готов к отправке отчета:', { 
-        wsExists: !!ws, 
-        wsState: ws?.readyState,
-        gameJoined 
-      });
     }
   }, [ws, gameJoined]);
 
-  // Timer countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (timerActive && timeLeft > 0) {
@@ -257,84 +213,58 @@ const PlayQuiz: React.FC = () => {
         setTimeLeft((prevTime) => prevTime - 1);
       }, 1000);
     } else if (timeLeft === 0 && timerActive) {
-      console.log('⏰ Время вышло!');
       setTimerActive(false);
     }
     return () => clearInterval(interval);
   }, [timerActive, timeLeft]);
 
-  // Handle cheating detection based on game mode
   useEffect(() => {
     if (!gameJoined || gameMode === 'normal') {
-      console.log('⚪ Отслеживание отключено:', { gameJoined, gameMode });
       return;
     }
 
-    console.log('🔍 Активировано отслеживание нарушений. Режим:', gameMode);
     let blurTimeout: NodeJS.Timeout | null = null;
 
     const handleVisibilityChange = () => {
-      console.log('👁️ visibilitychange event:', { 
-        hidden: document.hidden, 
-        gameMode,
-        wsReady: ws?.readyState === WebSocket.OPEN 
-      });
       
       if (document.hidden && (gameMode === 'lockdown' || gameMode === 'tab_tracking')) {
-        console.log('🚨 Обнаружено переключение вкладки - отправляем отчет');
         reportCheating();
       }
     };
 
     const handleBlur = () => {
-      console.log('👁️ blur event:', { gameMode, wsReady: ws?.readyState === WebSocket.OPEN });
       
-      // Debounce blur events to avoid multiple reports
       if (blurTimeout) {
         clearTimeout(blurTimeout);
       }
       
       blurTimeout = setTimeout(() => {
-        // Only report if tab is actually hidden (not just clicking on devtools)
         if (document.hidden && (gameMode === 'lockdown' || gameMode === 'tab_tracking')) {
-          console.log('🚨 Подтверждена потеря фокуса - отправляем отчет');
           reportCheating();
         }
-      }, 500); // Wait 500ms to confirm the blur
+      }, 500);
     };
 
     const handleFullscreenChange = () => {
-      console.log('👁️ fullscreenchange event:', { 
-        isFullscreen: !!document.fullscreenElement, 
-        gameMode,
-        wsReady: ws?.readyState === WebSocket.OPEN 
-      });
       
       if (gameMode === 'lockdown' && !document.fullscreenElement) {
-        console.log('🚨 Обнаружен выход из полноэкранного режима - отправляем отчет');
         reportCheating();
       }
     };
 
-    // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
 
-    console.log('✅ Event listeners добавлены');
 
-    // Request fullscreen for lockdown mode
     if (gameMode === 'lockdown' && gameJoined && !document.fullscreenElement) {
-      console.log('🔒 Запрашиваем полноэкранный режим для lockdown mode');
       const elem = document.documentElement;
       elem.requestFullscreen().catch((err) => {
-        console.error('❌ Ошибка при входе в полноэкранный режим:', err);
         alert('Для режима блокировки требуется полноэкранный режим. Пожалуйста, разрешите полноэкранный режим.');
       });
     }
 
     return () => {
-      console.log('🧹 Очистка event listeners');
       if (blurTimeout) {
         clearTimeout(blurTimeout);
       }
@@ -344,7 +274,6 @@ const PlayQuiz: React.FC = () => {
     };
   }, [gameJoined, gameMode, reportCheating, ws]);
 
-  // Check user authentication and role
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -352,7 +281,6 @@ const PlayQuiz: React.FC = () => {
         return;
       }
 
-      // Check if user is student (not teacher)
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
@@ -371,9 +299,8 @@ const PlayQuiz: React.FC = () => {
         
         setIsStudent(true);
         setPlayerName(user.displayName || user.email || 'Студент');
-        setUserUid(user.uid); // Сохраняем UID пользователя
+        setUserUid(user.uid);
       } catch (error) {
-        console.error('Ошибка при проверке роли пользователя:', error);
         navigate('/auth');
         return;
       }
@@ -384,22 +311,18 @@ const PlayQuiz: React.FC = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  // Function to handle code input
   const handleCodeSubmit = () => {
     if (codeInput.trim()) {
       setGameCode(codeInput.trim());
-      // Update URL with the code
       const newUrl = `/play?code=${codeInput.trim()}`;
       window.history.pushState({}, '', newUrl);
     }
   };
 
-  // Function to reset round result
   const resetRoundResult = () => {
     setRoundResult(null);
   };
 
-  // Function to reset game
   const resetGame = () => {
     setGameFinished(null);
     setRoundResult(null);
@@ -407,14 +330,11 @@ const PlayQuiz: React.FC = () => {
     setTimerActive(false);
   };
 
-  // Function to submit answer
   const submitAnswer = (answerIndices: number[]) => {
     if (ws && currentQuestion) {
-      console.log('📝 Отправляем ответ:', answerIndices);
       const answerMessage = { 
         answer: answerIndices
       };
-      console.log('📤 Отправляем ANSWER:', answerMessage);
       ws.send(JSON.stringify(answerMessage));
     }
   };
@@ -483,7 +403,6 @@ const PlayQuiz: React.FC = () => {
     );
   }
 
-  // If kicked, show kicked screen
   if (isKicked) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
@@ -762,7 +681,6 @@ const PlayQuiz: React.FC = () => {
                   <p className="text-sm text-yellow-800 mb-2 font-semibold">🧪 Режим отладки</p>
                   <Button
                     onClick={() => {
-                      console.log('🧪 Тестовая кнопка: отправка отчета о нарушении');
                       reportCheating();
                     }}
                     variant="outline"
