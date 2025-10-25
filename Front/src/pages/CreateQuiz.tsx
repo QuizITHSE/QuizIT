@@ -112,6 +112,8 @@ const CreateQuiz = () => {
             type: "single",
             points: "regular",
             timeLimit: 60,
+            explanation: "",
+            textAnswer: "",
         }
     ])
 
@@ -156,6 +158,8 @@ const CreateQuiz = () => {
                                             type: questionData.type || "single",
                                             points: questionData.points || "regular",
                                             timeLimit: questionData.timeLimit || 60,
+                                            explanation: questionData.explanation || "",
+                                            textAnswer: questionData.textAnswer || "",
                                         });
                                     }
                                 } catch (error) {
@@ -200,6 +204,26 @@ const CreateQuiz = () => {
         );
     };
 
+    const updateExplanation = (newText: string) => {
+        if (!quiz[index]) return;
+        
+        setQuiz((prev) =>
+            produce(prev, (draft) => {
+                draft[index].explanation = newText;
+            })
+        );
+    };
+
+    const updateTextAnswer = (newText: string) => {
+        if (!quiz[index]) return;
+        
+        setQuiz((prev) =>
+            produce(prev, (draft) => {
+                draft[index].textAnswer = newText;
+            })
+        );
+    };
+
     const saveQuiz = async () => {
         setSavingText("Сохраняется...")
         
@@ -217,6 +241,8 @@ const CreateQuiz = () => {
                         type: question.type,
                         points: question.points,
                         timeLimit: question.timeLimit,
+                        explanation: question.explanation,
+                        textAnswer: question.textAnswer,
                     };
                     
                     const docRef = await addDoc(collection(db, "questions"), newQuestion);
@@ -235,6 +261,8 @@ const CreateQuiz = () => {
                         type: question.type,
                         points: question.points,
                         timeLimit: question.timeLimit,
+                        explanation: question.explanation,
+                        textAnswer: question.textAnswer,
                     });
                     questionIds.push(question.id);
                 }
@@ -316,6 +344,8 @@ const CreateQuiz = () => {
             type: "single",
             points: "regular",
             timeLimit: 60,
+            explanation: "",
+            textAnswer: "",
         };
 
         setQuiz((prev) =>
@@ -459,7 +489,16 @@ const CreateQuiz = () => {
                         </div>
                     </div>
                     <div className='relative z-10 flex flex-col gap-2 p-4 w-full'>
-                        <div className="grid grid-cols-2 gap-2 w-full">
+                        {quiz[index]?.type === "text" ? (
+                            <textarea
+                                className='w-full bg-white rounded-2xl p-4 placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none'
+                                placeholder='Правильный текстовый ответ'
+                                value={quiz[index]?.textAnswer || ""}
+                                onChange={(e) => updateTextAnswer(e.target.value)}
+                                rows={6}
+                            ></textarea>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-2 w-full">
                             {/* First */}
                             <div
                                 className='rounded-lg p-4 text-white h-20 flex items-center drop-shadow-none transition-all duration-300'
@@ -593,6 +632,13 @@ const CreateQuiz = () => {
                                 </Button>
                             </div>
                         </div>
+                        )}
+                        <textarea
+                                className='w-full bg-white rounded-2xl p-2 placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none ml-2'
+                                placeholder='пояснение к правильному ответу'
+                                value={quiz[index]?.explanation || ""}
+                                onChange={(e) => updateExplanation(e.target.value)}
+                        ></textarea>
                     </div>
                 </div>
                 
