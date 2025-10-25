@@ -15,6 +15,7 @@ import StudentGameOverview from './pages/StudentGameOverview.tsx'
 import GroupDetails from './pages/GroupDetails.tsx'
 import HomeworkQuiz from './pages/HomeworkQuiz.tsx'
 import HomeworkResults from './pages/HomeworkResults.tsx'
+import EmailConfirmed from './pages/EmailConfirmed.tsx'
 
 const router = createBrowserRouter([
   { path: '/', element: <App/>},
@@ -29,7 +30,8 @@ const router = createBrowserRouter([
   { path: '/my-results', element: <StudentGameOverview/>},
   { path: '/group-details', element: <GroupDetails/>},
   { path: '/homework-quiz', element: <HomeworkQuiz/>},
-  { path: '/homework-results', element: <HomeworkResults/>}
+  { path: '/homework-results', element: <HomeworkResults/>},
+  { path: '/email-confirmed', element: <EmailConfirmed/>}
 ])
 
 

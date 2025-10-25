@@ -18,7 +18,8 @@ const StudentJoin = () => {
             const q = query(collection(db, 'groups'), where('code', '==', groupCode));
             const querySnapshot = await getDocs(q);
             if (querySnapshot.empty) {
-                setError('Группа с таким кодом не найдена');
+                setError('Неверный код приглашения. Пожалуйста, уточните код у вашего преподавателя');
+                setIsJoining(false);
                 return;
             }
             await updateDoc(querySnapshot.docs[0].ref, {
@@ -37,14 +38,20 @@ const StudentJoin = () => {
       const [isJoining, setIsJoining] = useState(false);
     const [groupCode, setGroupCode] = useState('');
     const [error, setError] = useState('');
-    const navigate = useNavigate(); 
+    const navigate = useNavigate();
+
+    const handleGroupCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setGroupCode(e.target.value);
+        if (error) setError(''); // Сбрасываем ошибку при вводе
+    }
 
     return (
         <div className="min-h-screen w-full montserrat-600 flex justify-center items-center flex-col">
             <div className="w-[500px] p-5 flex flex-col gap-5 items-center justify-center rounded-lg border-2 bordeer-grey-300 overflow-hidden">
                 <h1 className='text-2xl font-bold'>Присоединиться к группе</h1>
-                <Input type='text' placeholder='Код группы' value={groupCode} onChange={(e) => setGroupCode(e.target.value)}/>
-                <Button onClick={joinGroup} className='cursor-pointer'>{isJoining ? <Spinner /> : 'Присоединиться'}</Button> 
+                <Input type='text' placeholder='Код группы' value={groupCode} onChange={handleGroupCodeChange}/>
+                {error && <p className='text-red-500 text-sm text-center w-full'>{error}</p>}
+                <Button onClick={joinGroup} className='cursor-pointer'>{isJoining ? <Spinner color=''/> : 'Присоединиться'}</Button> 
                 <Link className='text-sm text-gray-500' to='/'>Позже</Link>
             </div>
         </div>
