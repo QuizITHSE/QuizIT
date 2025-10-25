@@ -36,7 +36,7 @@ const QuizResultsTable: React.FC = () => {
 
   const columnHelper = createColumnHelper<QuizResult>();
 
-  const columns = [
+  const baseColumns = [
     columnHelper.accessor('placement', {
       header: 'Место',
       cell: (info) => {
@@ -115,30 +115,28 @@ const QuizResultsTable: React.FC = () => {
     }),
   ];
 
-  if (gameMode === 'tab_tracking' || gameMode === 'lockdown') {
-    columns.push(
-      columnHelper.accessor('tab_switches', {
-        header: 'Переключения вкладок',
-        cell: (info) => {
-          const switches = info.getValue() || 0;
-          return (
-            <div className="flex items-center justify-center">
-              {switches > 0 ? (
-                <div className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  <span className="text-sm font-semibold">{switches}</span>
-                </div>
-              ) : (
-                <span className="text-sm text-green-600">0</span>
-              )}
+  const tabTrackingColumn = columnHelper.accessor('tab_switches', {
+    header: 'Переключения вкладок',
+    cell: (info) => {
+      const switches = info.getValue() || 0;
+      return (
+        <div className="flex items-center justify-center">
+          {switches > 0 ? (
+            <div className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              <span className="text-sm font-semibold">{switches}</span>
             </div>
-          );
-        },
-      })
-    );
-  }
+          ) : (
+            <span className="text-sm text-green-600">0</span>
+          )}
+        </div>
+      );
+    },
+  });
 
-  const finalColumns = columns;
+  const finalColumns = (gameMode === 'tab_tracking' || gameMode === 'lockdown') 
+    ? [...baseColumns, tabTrackingColumn]
+    : baseColumns;
 
   const table = useReactTable({
     data: results,
