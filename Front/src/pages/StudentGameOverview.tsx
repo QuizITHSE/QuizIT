@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where, getDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, getDoc, doc, addDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Trophy, Calendar, Target, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Trophy, Calendar, Target, AlertTriangle, CheckCircle, XCircle, Clock, BookOpen, Loader2 } from 'lucide-react';
 
 interface UserGameResult {
   gameId: string;
@@ -35,6 +35,7 @@ interface Answer {
   points_earned: number;
   possible_points: number;
   missed?: boolean;
+  explanation?: string;
 }
 
 const StudentGameOverview: React.FC = () => {
@@ -42,6 +43,9 @@ const StudentGameOverview: React.FC = () => {
   const [results, setResults] = useState<UserGameResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<UserGameResult | null>(null);
+  const [creatingRevision, setCreatingRevision] = useState(false);
+  const [gameData, setGameData] = useState<any>(null);
+  const [quizData, setQuizData] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -127,6 +131,35 @@ const StudentGameOverview: React.FC = () => {
     return () => unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    const loadGameData = async () => {
+      if (!selectedGame) {
+        setGameData(null);
+        setQuizData(null);
+        return;
+      }
+
+      try {
+        const gameDoc = await getDoc(doc(db, 'games', selectedGame.gameId));
+        if (gameDoc.exists()) {
+          const gameDocData = gameDoc.data();
+          setGameData(gameDocData);
+          
+          if (gameDocData.quiz_id) {
+            const quizDoc = await getDoc(doc(db, 'quizes', gameDocData.quiz_id));
+            if (quizDoc.exists()) {
+              setQuizData(quizDoc.data());
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading game data:', error);
+      }
+    };
+
+    loadGameData();
+  }, [selectedGame]);
+
   const formatDate = (date: any) => {
     if (!date) return 'Неизвестно';
     const dateObj = date.toDate ? date.toDate() : new Date(date);
@@ -161,6 +194,127 @@ const StudentGameOverview: React.FC = () => {
         return { label: '👁️ Tracking', color: 'text-yellow-600 bg-yellow-50' };
       default:
         return { label: '📝 Normal', color: 'text-gray-600 bg-gray-50' };
+    }
+  };
+
+  const handleCreateRevisionQuiz = async () => {
+    if (!selectedGame || !auth.currentUser) return;
+    
+    setCreatingRevision(true);
+    try {
+      // Get wrong/missed answers
+      const wrongAnswers = selectedGame.answers.filter(a => !a.is_correct);
+      
+      if (wrongAnswers.length === 0) {
+        alert('У вас нет ошибок для повторения!');
+        setCreatingRevision(false);
+        return;
+      }
+      
+      let questionIds: string[] = [];
+      let quizTitle = '';
+      
+      // If we have quizData with original questions, use them
+      if (quizData && quizData.questions) {
+        const originalQuestions = quizData.questions;
+        const mistakeQuestionIndices = wrongAnswers.map(a => a.question_number - 1);
+        
+        for (const questionIdx of mistakeQuestionIndices) {
+          if (originalQuestions[questionIdx]) {
+            questionIds.push(originalQuestions[questionIdx]);
+          }
+        }
+        quizTitle = `Квиз повторения ошибок - ${selectedGame.username}`;
+      } else {
+        // Fallback: create questions from answer data
+        const questionPromises = wrongAnswers.map(async (answer) => {
+          const isTextQuestion = answer.question_type === 'text';
+          const questionData: any = {
+            question: answer.question_text,
+            options: answer.options,
+            correct: isTextQuestion 
+              ? []
+              : (Array.isArray(answer.correct_answer) 
+                ? answer.correct_answer 
+                : typeof answer.correct_answer === 'number' 
+                ? [answer.correct_answer]
+                : []),
+            type: answer.question_type,
+            points: answer.possible_points,
+            timeLimit: 60,
+            explanation: answer.explanation || ''
+          };
+          
+          if (isTextQuestion && typeof answer.correct_answer === 'string') {
+            questionData.textAnswer = answer.correct_answer;
+          }
+          
+          const docRef = await addDoc(collection(db, 'questions'), questionData);
+          return docRef.id;
+        });
+        
+        questionIds = await Promise.all(questionPromises);
+        quizTitle = `Квиз повторения ошибок - ${selectedGame.username}`;
+      }
+      
+      const revisionQuizData = {
+        title: quizTitle,
+        questions: questionIds,
+        owner: auth.currentUser.uid,
+        createdAt: new Date(),
+        isRevisionQuiz: true,
+        originalGameId: selectedGame.gameId,
+        originalStudentId: auth.currentUser.uid
+      };
+      
+      const revisionQuizRef = await addDoc(collection(db, 'quizes'), revisionQuizData);
+      
+      // Find the group for this student
+      const groupsQuery = query(
+        collection(db, 'groups'),
+        where('students', 'array-contains', auth.currentUser!.uid)
+      );
+      const groupsSnapshot = await getDocs(groupsQuery);
+      
+      if (groupsSnapshot.empty) {
+        alert('Не найдена группа для вас');
+        setCreatingRevision(false);
+        return;
+      }
+      
+      const group = groupsSnapshot.docs[0].data();
+      const groupId = groupsSnapshot.docs[0].id;
+      const teacherId = group.admin;
+      
+      // Create homework assignment for this specific student
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 7);
+      
+      const homeworkData = {
+        quiz_id: revisionQuizRef.id,
+        quiz_title: revisionQuizData.title,
+        group_id: groupId,
+        group_name: group.name,
+        teacher_id: teacherId,
+        created_at: new Date(),
+        deadline: deadline,
+        total_questions: questionIds.length,
+        is_active: true,
+        description: quizData ? `Квиз повторения ошибок из игры ${quizData.title}` : 'Квиз повторения ошибок',
+        mode: 'normal',
+        time_limit_minutes: null,
+        assigned_to_students: [auth.currentUser.uid]
+      };
+      
+      await addDoc(collection(db, 'homework'), homeworkData);
+      
+      alert(`Квиз повторения ошибок успешно создан и назначен вам!`);
+      
+    } catch (error) {
+      console.error('Error creating revision quiz:', error);
+      alert('Ошибка при создании квиза повторения ошибок');
+    } finally {
+      setCreatingRevision(false);
     }
   };
 
@@ -312,6 +466,40 @@ const StudentGameOverview: React.FC = () => {
             </div>
           )}
 
+          {/* Create Revision Quiz Button */}
+          {(selectedGame.wrong_answers > 0 || selectedGame.missed_answers > 0) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="h-8 w-8 text-blue-600" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Квиз повторения ошибок</h3>
+                    <p className="text-sm text-gray-600">
+                      Создайте квиз из {selectedGame.wrong_answers + selectedGame.missed_answers} вопросов, на которые вы ответили неправильно или пропустили
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCreateRevisionQuiz}
+                  disabled={creatingRevision}
+                  className="cursor-pointer"
+                >
+                  {creatingRevision ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Создание...
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Создать квиз повторения
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Detailed Answers */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
@@ -368,46 +556,71 @@ const StudentGameOverview: React.FC = () => {
                       </div>
                       <p className="text-gray-700 mb-3 font-medium">{answer.question_text}</p>
                       
-                      {/* Display all options with visual indicators */}
-                      <div className="space-y-2 mb-3">
-                        {answer.options.map((option, optionIndex) => {
-                          const isUserAnswer = Array.isArray(answer.user_answer)
-                            ? answer.user_answer.includes(optionIndex)
-                            : answer.user_answer === optionIndex;
-                          
-                          const isCorrectAnswer = Array.isArray(answer.correct_answer)
-                            ? answer.correct_answer.includes(optionIndex)
-                            : answer.correct_answer === optionIndex;
-                          
-                          let bgColor = 'bg-gray-50 border-gray-200';
-                          let icon = null;
-                          
-                          if (isCorrectAnswer && isUserAnswer) {
-                            bgColor = 'bg-green-100 border-green-300';
-                            icon = <CheckCircle className="h-4 w-4 text-green-600" />;
-                          } else if (isCorrectAnswer && !isUserAnswer) {
-                            bgColor = 'bg-green-50 border-green-200';
-                            icon = <CheckCircle className="h-4 w-4 text-green-500" />;
-                          } else if (!isCorrectAnswer && isUserAnswer) {
-                            bgColor = 'bg-red-100 border-red-300';
-                            icon = <XCircle className="h-4 w-4 text-red-600" />;
-                          }
-                          
-                          return (
-                            <div
-                              key={optionIndex}
-                              className={`border-2 rounded p-2 flex items-center justify-between ${bgColor}`}
-                            >
-                              <span className="text-sm text-gray-800">{option}</span>
-                              {icon}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {answer.question_type === 'text' ? (
+                        <div className="space-y-3 mb-3">
+                          <div className="border-2 rounded p-3 bg-gray-50 border-gray-200">
+                            <p className="text-xs font-semibold text-gray-500 mb-1">Ваш ответ:</p>
+                            <p className="text-sm text-gray-800">
+                              {answer.user_answer ? (typeof answer.user_answer === 'string' ? answer.user_answer : String(answer.user_answer)) : 'Не отвечено'}
+                            </p>
+                          </div>
+                          <div className="border-2 rounded p-3 bg-green-50 border-green-200">
+                            <p className="text-xs font-semibold text-green-600 mb-1">Правильный ответ:</p>
+                            <p className="text-sm text-gray-800">
+                              {typeof answer.correct_answer === 'string' ? answer.correct_answer : String(answer.correct_answer)}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Display all options with visual indicators */}
+                          <div className="space-y-2 mb-3">
+                            {answer.options.map((option, optionIndex) => {
+                              const isUserAnswer = Array.isArray(answer.user_answer)
+                                ? answer.user_answer.includes(optionIndex)
+                                : answer.user_answer === optionIndex;
+                              
+                              const isCorrectAnswer = Array.isArray(answer.correct_answer)
+                                ? answer.correct_answer.includes(optionIndex)
+                                : answer.correct_answer === optionIndex;
+                              
+                              let bgColor = 'bg-gray-50 border-gray-200';
+                              let icon = null;
+                              
+                              if (isCorrectAnswer && isUserAnswer) {
+                                bgColor = 'bg-green-100 border-green-300';
+                                icon = <CheckCircle className="h-4 w-4 text-green-600" />;
+                              } else if (isCorrectAnswer && !isUserAnswer) {
+                                bgColor = 'bg-green-50 border-green-200';
+                                icon = <CheckCircle className="h-4 w-4 text-green-500" />;
+                              } else if (!isCorrectAnswer && isUserAnswer) {
+                                bgColor = 'bg-red-100 border-red-300';
+                                icon = <XCircle className="h-4 w-4 text-red-600" />;
+                              }
+                              
+                              return (
+                                <div
+                                  key={optionIndex}
+                                  className={`border-2 rounded p-2 flex items-center justify-between ${bgColor}`}
+                                >
+                                  <span className="text-sm text-gray-800">{option}</span>
+                                  {icon}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                       
                       {answer.missed && (
                         <div className="text-sm text-yellow-700 font-medium bg-yellow-100 rounded p-2 mb-2">
                           ⏱️ Вы не успели ответить на этот вопрос
+                        </div>
+                      )}
+                      
+                      {answer.explanation && (
+                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                          <p><strong className="text-blue-700">Объяснение:</strong> <span className="text-gray-700">{answer.explanation}</span></p>
                         </div>
                       )}
                     </div>

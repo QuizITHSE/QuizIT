@@ -84,6 +84,7 @@ const HostQuiz: React.FC = () => {
   const quizId = searchParams.get('id');
   const groupId = searchParams.get('group');
   const gameMode = searchParams.get('gameMode') || 'normal';
+  const disableCopy = searchParams.get('disableCopy') === 'true';
 
   useEffect(() => {
     const websocket = new WebSocket('ws://localhost:8765');
@@ -225,13 +226,14 @@ const HostQuiz: React.FC = () => {
         quiz: quizId, 
         group: groupId, 
         game_type: {
-          mode: gameMode
+          mode: gameMode,
+          disable_copy: disableCopy
         }
       };
       ws.send(JSON.stringify(createQuizMessage));
       setQuizCreated(true);
     }
-  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated, gameMode]);
+  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated, gameMode, disableCopy]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;

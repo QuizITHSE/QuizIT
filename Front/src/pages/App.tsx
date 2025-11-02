@@ -10,6 +10,7 @@ import { Play, Users, TrendingUp, BookOpen, Calendar, UserCheck, FileText, Clock
 
 function App() {
   const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isTeacher, setIsTeacher] = useState(false);
   const [activeGame, setActiveGame] = useState<{
     code: string;
@@ -183,6 +184,13 @@ function App() {
         for (const homeworkDoc of homeworkSnapshot.docs) {
           const homeworkData_doc = homeworkDoc.data();
           
+          // Check if homework is assigned to specific students
+          if (homeworkData_doc.assigned_to_students && Array.isArray(homeworkData_doc.assigned_to_students)) {
+            if (!homeworkData_doc.assigned_to_students.includes(studentUid)) {
+              continue; // Skip if student is not in the assigned list
+            }
+          }
+          
           let submission = null;
           let status: 'Не начато' | 'Выполнено' | 'Просрочено' | 'Выполнено с опозданием' | 'Нарушение' = 'Не начато';
           
@@ -236,16 +244,22 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-      
       try {
+        if (!user) {
+          setIsAuthenticated(false);
+          setIsTeacher(false);
+          setLoading(false);
+          return;
+        }
+        
+        setIsAuthenticated(true);
+        
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         
         if (!userDoc.exists()) {
-          navigate("/auth");
+          setIsAuthenticated(false);
+          setIsTeacher(false);
+          setLoading(false);
           return;
         }
         
@@ -260,13 +274,14 @@ function App() {
         }
         
       } catch (error) {
-        navigate("/auth");
+        setIsAuthenticated(false);
+        setIsTeacher(false);
       } finally {
         setLoading(false);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const isHomeworkOverdue = (deadline: any): boolean => {
     const deadlineDate = deadline?.toDate ? deadline.toDate() : new Date(deadline);
@@ -349,32 +364,67 @@ function App() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Добро пожаловать, {isTeacher ? "Учитель" : "Студент"}!
+              {isAuthenticated ? `Добро пожаловать, ${isTeacher ? "Учитель" : "Студент"}!` : "QuizIT"}
             </h1>
             <p className="text-gray-600 mt-2">
-              {isTeacher ? "Управляйте своими квизами и создавайте новые" : "Присоединяйтесь к квизам и проверяйте свои знания"}
+              {isAuthenticated 
+                ? (isTeacher ? "Управляйте своими квизами и создавайте новые" : "Присоединяйтесь к квизам и проверяйте свои знания")
+                : "Система для проведения викторин и проверки знаний"}
             </p>
           </div>
           <div className="flex gap-3">
-            {isTeacher && (
+            {!isAuthenticated ? (
               <Button 
                 className='cursor-pointer bg-blue-600 hover:bg-blue-700 px-6 py-3 text-lg' 
-                onClick={createQuiz}
+                onClick={() => navigate('/auth')}
               >
-                Создать викторину
+                Войти
               </Button>
+            ) : (
+              <>
+                {isTeacher && (
+                  <Button 
+                    className='cursor-pointer bg-blue-600 hover:bg-blue-700 px-6 py-3 text-lg' 
+                    onClick={createQuiz}
+                  >
+                    Создать викторину
+                  </Button>
+                )}
+                <Button 
+                  variant="outline"
+                  className='cursor-pointer px-6 py-3 text-lg' 
+                  onClick={handleLogout}
+                >
+                  Выйти
+                </Button>
+              </>
             )}
-            <Button 
-              variant="outline"
-              className='cursor-pointer px-6 py-3 text-lg' 
-              onClick={handleLogout}
-            >
-              Выйти
-            </Button>
           </div>
         </div>
         
-        {isTeacher ? (
+        {!isAuthenticated ? (
+          <div className="max-w-2xl mx-auto mt-16 text-center">
+            <div className="bg-white rounded-lg shadow-lg p-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                Добро пожаловать в QuizIT!
+              </h2>
+              <p className="text-lg text-gray-600 mb-8">
+                Система для проведения онлайн викторин и проверки знаний
+              </p>
+              <div className="space-y-4">
+                <Button 
+                  className='cursor-pointer bg-blue-600 hover:bg-blue-700 px-8 py-4 text-lg' 
+                  onClick={() => navigate('/auth')}
+                >
+                  Войти в систему
+                </Button>
+                <p className="text-sm text-gray-500 mt-4">
+                  Войдите, чтобы начать использовать QuizIT
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : isTeacher ? (
           <div className="space-y-8">
             {/* Teacher Groups Section */}
             <div className="bg-white rounded-lg shadow-md p-6">

@@ -28,6 +28,10 @@ interface QuizResult {
 const QuizResultsTable: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  
+  const handleStudentClick = (studentId: string) => {
+    navigate(`/student-quiz-details?gameId=${gameId}&studentId=${studentId}`);
+  };
   const [results, setResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,11 +72,17 @@ const QuizResultsTable: React.FC = () => {
     }),
     columnHelper.accessor('username', {
       header: 'Имя участника',
-      cell: (info) => (
-        <div className="font-medium text-gray-900">
-          {info.getValue()}
-        </div>
-      ),
+      cell: (info) => {
+        const row = info.row.original;
+        return (
+          <div 
+            className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={() => handleStudentClick(row.user_id)}
+          >
+            {info.getValue()}
+          </div>
+        );
+      },
     }),
     columnHelper.accessor('score', {
       header: 'Очки',

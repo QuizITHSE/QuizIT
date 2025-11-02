@@ -16,6 +16,9 @@ export interface Homework {
   // Режимы выполнения и время
   mode: 'normal' | 'lockdown' | 'tab_tracking';  // Режим выполнения
   time_limit_minutes: number | null;  // Лимит времени в минутах (null = без ограничения)
+  
+  // Назначение конкретным студентам (опционально)
+  assigned_to_students?: string[];   // Массив UID студентов, если задание назначено не всей группе
 }
 
 export interface HomeworkSubmission {

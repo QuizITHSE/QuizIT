@@ -19,7 +19,7 @@ import { Spinner } from '@/components/ui/spinner';
 
 
 import { addDoc, collection, doc, setDoc } from "firebase/firestore";
-import { db, app } from '@/lib/firebase';
+import { db, app, auth } from '@/lib/firebase';
 
 import { useForm } from "react-hook-form"
 import {
@@ -145,8 +145,7 @@ function Auth() {
         }
         
         try {
-            const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth");
-            const auth = getAuth();
+            const { signInWithEmailAndPassword } = await import("firebase/auth");
             
             await signInWithEmailAndPassword(auth, values.email.trim(), values.password);
             navigate("/");
@@ -200,8 +199,7 @@ function Auth() {
         setIsCreatingAccount(true);
 
         try {
-            const { getAuth, fetchSignInMethodsForEmail, createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth");
-            const auth = getAuth();
+            const { fetchSignInMethodsForEmail, createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth");
 
             const methods = await fetchSignInMethodsForEmail(auth, values.email);
             if (methods.length > 0) {

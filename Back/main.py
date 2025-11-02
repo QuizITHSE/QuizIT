@@ -159,8 +159,16 @@ class Lobby:
         
         # Check if answer is correct and update score immediately
         current_q = self.quiz["questions"][self.current_question]
-        correct_answer = current_q["correct"]
-        is_correct = answer == correct_answer
+        question_type = current_q.get("type", "single")
+        
+        # For text questions, get the correct answer from textAnswer field
+        if question_type == "text":
+            correct_answer = current_q.get("textAnswer", current_q.get("correct", ""))
+            is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
+        else:
+            correct_answer = current_q["correct"]
+            is_correct = answer == correct_answer
+            
         question_points = current_q.get("point", 1)
         points_earned = question_points if is_correct else 0
         
@@ -180,7 +188,8 @@ class Lobby:
             "correct_answer": correct_answer,
             "is_correct": is_correct,
             "points_earned": points_earned,
-            "possible_points": question_points
+            "possible_points": question_points,
+            "explanation": current_q.get("explanation", "")
         }
         self.user_answers[user.user_id].append(answer_record)
         print(f"📝 Recorded answer for {user.username} on Q{self.current_question}: {'✓' if is_correct else '✗'} ({points_earned}/{question_points} pts)")
@@ -200,9 +209,19 @@ class Lobby:
         self.currently_round = False
         info_for_host = {"right": 0, "wrong": 0, "by_answer": {}}
         
-        # Initialize answer counts
-        for i in range(len(self.quiz["questions"][self.current_question]["options"])):
-            info_for_host["by_answer"][i] = 0
+        current_q = self.quiz["questions"][self.current_question]
+        question_type = current_q.get("type", "single")
+        
+        # For text questions, get the correct answer from textAnswer field
+        if question_type == "text":
+            correct_answer = current_q.get("textAnswer", current_q.get("correct", ""))
+        else:
+            correct_answer = current_q["correct"]
+        
+        # Initialize answer counts (skip for text questions)
+        if question_type != "text":
+            for i in range(len(self.quiz["questions"][self.current_question]["options"])):
+                info_for_host["by_answer"][i] = 0
         
         # Process all answers for statistics and send correct/incorrect to players
         for answer_info in self.answers:
@@ -219,7 +238,11 @@ class Lobby:
                     info_for_host["by_answer"][answer] += 1
             
             # Check if answer is correct and send to player
-            is_correct = answer == self.quiz["questions"][self.current_question]["correct"]
+            if question_type == "text":
+                is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
+            else:
+                is_correct = answer == correct_answer
+                
             if is_correct:
                 info_for_host["right"] += 1
 
@@ -239,7 +262,11 @@ class Lobby:
         answered_user_ids = set()
         for answer_info in self.answers:
             answer = answer_info["answer"]
-            is_correct = answer == self.quiz["questions"][self.current_question]["correct"]
+            # Check correctness using appropriate method for question type
+            if question_type == "text":
+                is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
+            else:
+                is_correct = answer == correct_answer
             answered_user_ids.add(answer_info["user"].user_id)
             
             await answer_info["user"].ws_id.send(json.dumps({
@@ -263,17 +290,25 @@ class Lobby:
                 
                 # Record missed answer
                 current_q = self.quiz["questions"][self.current_question]
+                question_type = current_q.get("type", "single")
+                # Get correct answer using appropriate field for question type
+                if question_type == "text":
+                    correct_answer = current_q.get("textAnswer", current_q.get("correct", ""))
+                else:
+                    correct_answer = current_q["correct"]
+                    
                 answer_record = {
                     "question_number": self.current_question,
                     "question_text": current_q.get("question", ""),
                     "question_type": current_q.get("type", "single"),
                     "options": current_q.get("options", []),
                     "user_answer": None,
-                    "correct_answer": current_q["correct"],
+                    "correct_answer": correct_answer,
                     "is_correct": False,
                     "points_earned": 0,
                     "possible_points": question_points,
-                    "missed": True
+                    "missed": True,
+                    "explanation": current_q.get("explanation", "")
                 }
                 self.user_answers[player.user_id].append(answer_record)
                 print(f"⏱️ Recorded MISSED answer for {player.username} on Q{self.current_question}")
@@ -494,7 +529,7 @@ async def cleanup_user(websocket):
         del USERS[websocket]
         print(f"Cleaned up user data for: {websocket.remote_address}")
 
-def create_game(user: User, group_id, game_type):
+def create_game(user: User, group_id, game_type, quiz_id):
     game_code = generate_unique_game_code(6)
     write_result, doc_ref = db.collection("games").add({
         "host": user.user_id, 
@@ -503,7 +538,8 @@ def create_game(user: User, group_id, game_type):
         "active": True, 
         "game_finished": False,
         "code": game_code,
-        "type": game_type
+        "type": game_type,
+        "quiz_id": quiz_id
     })
     if write_result:
         return game_code, doc_ref.id
@@ -546,9 +582,10 @@ async def main_handler(websocket):
             if user_obj["user"].teacher and "quiz" in message and not user_obj["lobby"]:
                 await websocket.send(json.dumps({"type": "creating_game", "message": "creating..."}))
                 game_type = message.get("game_type", {})
-                code, game_id = create_game(user_obj["user"], message.get("group"), game_type)
+                quiz_id = message.get("quiz")
+                code, game_id = create_game(user_obj["user"], message.get("group"), game_type, quiz_id)
                 print(code, game_id)
-                quiz = fetch_quiz(message.get("quiz"))
+                quiz = fetch_quiz(quiz_id)
                 user_obj["lobby"] = Lobby(user_obj["user"], quiz, game_id, code, game_type)
                 LOBBIES.append(user_obj["lobby"])
                 await websocket.send(json.dumps({"type": "game_created", "message": f"done! room code: {code}", "code": code}))
@@ -573,7 +610,8 @@ async def main_handler(websocket):
                         "type": "joined", 
                         "message": "Joined! Waiting for start", 
                         "game_settings": {
-                            "mode": target_lobby.game_type.get("mode", "normal")
+                            "mode": target_lobby.game_type.get("mode", "normal"),
+                            "disable_copy": target_lobby.game_type.get("disable_copy", False)
                         }
                     }))
                     print(target_lobby.quiz["title"])

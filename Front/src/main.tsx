@@ -16,6 +16,8 @@ import GroupDetails from './pages/GroupDetails.tsx'
 import HomeworkQuiz from './pages/HomeworkQuiz.tsx'
 import HomeworkResults from './pages/HomeworkResults.tsx'
 import EmailConfirmed from './pages/EmailConfirmed.tsx'
+import StudentQuizDetails from './pages/StudentQuizDetails.tsx'
+import HomeworkDetails from './pages/HomeworkDetails.tsx'
 
 const router = createBrowserRouter([
   { path: '/', element: <App/>},
@@ -27,10 +29,12 @@ const router = createBrowserRouter([
   { path: '/host', element: <HostQuiz/>},
   { path: '/play', element: <PlayQuiz/>},
   { path: '/results/:gameId', element: <QuizResultsTable/>},
+  { path: '/student-quiz-details', element: <StudentQuizDetails/>},
   { path: '/my-results', element: <StudentGameOverview/>},
   { path: '/group-details', element: <GroupDetails/>},
   { path: '/homework-quiz', element: <HomeworkQuiz/>},
   { path: '/homework-results', element: <HomeworkResults/>},
+  { path: '/homework-details', element: <HomeworkDetails/>},
   { path: '/email-confirmed', element: <EmailConfirmed/>}
 ])
 

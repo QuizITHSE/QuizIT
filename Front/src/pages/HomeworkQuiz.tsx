@@ -14,6 +14,7 @@ interface QuizQuestion {
   options: string[];
   correct: number[];
   point: number;
+  textAnswer?: string;
 }
 
 interface HomeworkQuizState {
@@ -38,7 +39,7 @@ const HomeworkQuiz: React.FC = () => {
   const [userName, setUserName] = useState<string>('');
   
   const [currentQuiestion, setCurrentQuiestion] = useState(0);
-  const [answers, setAnswers] = useState<number[][]>([]);
+  const [answers, setAnswers] = useState<(number[] | string)[]>([]);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [timeStarted, setTimeStarted] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -130,7 +131,8 @@ const HomeworkQuiz: React.FC = () => {
                   type: questionData.type || 'single',
                   options: questionData.options || ['', '', '', ''],
                   correct: questionData.correct || [],
-                  point: typeof questionData.points === 'number' ? questionData.points : (questionData.points === 'regular' ? 1 : (questionData.points === 'hard' ? 2 : 1))
+                  point: typeof questionData.points === 'number' ? questionData.points : (questionData.points === 'regular' ? 1 : (questionData.points === 'hard' ? 2 : 1)),
+                  textAnswer: questionData.textAnswer || ''
                 });
               } else {
               }
@@ -256,7 +258,7 @@ const HomeworkQuiz: React.FC = () => {
     }
   };
 
-  const handleSubmitAnswer = (answer: number[]) => {
+  const handleSubmitAnswer = (answer: number[] | string) => {
     
     const newAnswers = [...answers];
     newAnswers[currentQuiestion - 1] = answer;
@@ -296,15 +298,19 @@ const HomeworkQuiz: React.FC = () => {
 
       const totalQuestions = state.quiz.questions.length;
 
-      const detailedAnswers = state.quiz.questions.map((question, index) => ({
-        question_index: index,
-        question_text: question.question,
-        student_answer: answers[index] || [],
-        correct_answer: question.correct,
-        is_correct: false,
-        points_earned: 0,
-        max_points: question.point
-      }));
+      const detailedAnswers = state.quiz.questions.map((question, index) => {
+        const defaultAnswer = question.type === 'text' ? '' : [];
+        return {
+          question_index: index,
+          question_text: question.question,
+          student_answer: answers[index] !== undefined ? answers[index] : defaultAnswer,
+          correct_answer: question.type === 'text' ? (question.textAnswer || question.correct) : question.correct,
+          is_correct: false,
+          points_earned: 0,
+          max_points: question.point,
+          question_type: question.type
+        };
+      });
 
       const submission = {
         student_id: userUid,
@@ -369,12 +375,27 @@ const HomeworkQuiz: React.FC = () => {
       let missedAnswers = 0;
 
       const detailedAnswers = state.quiz.questions.map((question, index) => {
-        const studentAnswer = answers[index] || [];
-        const isCorrect = studentAnswer.length > 0 && 
-          studentAnswer.length === question.correct.length &&
-          studentAnswer.every(ans => question.correct.includes(ans));
+        const defaultAnswer = question.type === 'text' ? '' : [];
+        const studentAnswer = answers[index] !== undefined ? answers[index] : defaultAnswer;
         
-        if (studentAnswer.length === 0) {
+        let isCorrect = false;
+        let hasAnswer = false;
+        
+        if (question.type === 'text') {
+          // For text questions, compare strings (case-insensitive)
+          const studentText = typeof studentAnswer === 'string' ? studentAnswer.trim().toLowerCase() : '';
+          const correctText = (question.textAnswer || question.correct || '').toString().trim().toLowerCase();
+          hasAnswer = studentText.length > 0;
+          isCorrect = hasAnswer && studentText === correctText;
+        } else {
+          // For choice questions, compare arrays
+          hasAnswer = Array.isArray(studentAnswer) && studentAnswer.length > 0;
+          isCorrect = hasAnswer && 
+            studentAnswer.length === question.correct.length &&
+            studentAnswer.every(ans => question.correct.includes(ans));
+        }
+        
+        if (!hasAnswer) {
           missedAnswers++;
         } else if (isCorrect) {
           correctAnswers++;
@@ -387,10 +408,11 @@ const HomeworkQuiz: React.FC = () => {
           question_index: index,
           question_text: question.question,
           student_answer: studentAnswer,
-          correct_answer: question.correct,
+          correct_answer: question.type === 'text' ? (question.textAnswer || question.correct) : question.correct,
           is_correct: isCorrect,
           points_earned: isCorrect ? question.point : 0,
-          max_points: question.point
+          max_points: question.point,
+          question_type: question.type
         };
       });
 
@@ -512,7 +534,7 @@ const HomeworkQuiz: React.FC = () => {
   if (currentQuiestion > 0 && state.quiz && state.quiz.questions.length > 0) {
     const isResultsView = currentQuiestion === state.quiz.questions.length + 1;
     const currentQuestion = !isResultsView ? state.quiz.questions[currentQuiestion - 1] : null;
-    const currentAnswers = currentQuestion ? (answers[currentQuiestion - 1] || []) : [];
+    const currentAnswers = currentQuestion ? (answers[currentQuiestion - 1] || (currentQuestion.type === 'text' ? '' : [])) : [];
     
     const formatTime = (seconds: number) => {
       const mins = Math.floor(seconds / 60);
@@ -520,7 +542,12 @@ const HomeworkQuiz: React.FC = () => {
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const answeredCount = answers.filter(a => a && a.length > 0).length;
+    const answeredCount = answers.filter(a => {
+      if (!a) return false;
+      if (Array.isArray(a)) return a.length > 0;
+      if (typeof a === 'string') return a.trim().length > 0;
+      return false;
+    }).length;
     const totalQuestions = state.quiz.questions.length;
     
     return (
@@ -608,9 +635,14 @@ const HomeworkQuiz: React.FC = () => {
               <div className="border-t pt-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-medium text-gray-600 mr-2">Навигация:</span>
-                  {state.quiz.questions.map((_, index) => {
+                  {state.quiz.questions.map((q, index) => {
                     const questionNumber = index + 1;
-                    const hasAnswer = answers[index] && answers[index].length > 0;
+                    const answer = answers[index];
+                    const hasAnswer = answer && (
+                      Array.isArray(answer) ? answer.length > 0 : 
+                      typeof answer === 'string' ? answer.trim().length > 0 : 
+                      false
+                    );
                     const isCurrent = questionNumber === currentQuiestion && !isResultsView;
                     
                     return (
@@ -674,7 +706,12 @@ const HomeworkQuiz: React.FC = () => {
                 <div className="space-y-3 mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-3">Статус вопросов:</h3>
                   {state.quiz.questions.map((q, index) => {
-                    const hasAnswer = answers[index] && answers[index].length > 0;
+                    const answer = answers[index];
+                    const hasAnswer = answer && (
+                      Array.isArray(answer) ? answer.length > 0 : 
+                      typeof answer === 'string' ? answer.trim().length > 0 : 
+                      false
+                    );
                     const questionNumber = index + 1;
                     
                     return (
@@ -698,7 +735,10 @@ const HomeworkQuiz: React.FC = () => {
                             </p>
                             {hasAnswer && (
                               <p className="text-xs text-gray-600 mt-1">
-                                Выбрано вариантов: {answers[index].map(i => i + 1).join(', ')}
+                                {Array.isArray(answer) 
+                                  ? `Выбрано вариантов: ${answer.map(i => i + 1).join(', ')}`
+                                  : `Ответ: ${answer}`
+                                }
                               </p>
                             )}
                           </div>
@@ -799,7 +839,8 @@ const HomeworkQuiz: React.FC = () => {
               questionData={{
                 question: currentQuestion.question,
                 type: currentQuestion.type,
-                options: currentQuestion.options
+                options: currentQuestion.options,
+                textAnswer: currentQuestion.textAnswer
               }}
               onSubmitAnswer={handleSubmitAnswer}
               initialAnswers={currentAnswers}

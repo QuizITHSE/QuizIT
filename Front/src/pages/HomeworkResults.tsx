@@ -32,11 +32,13 @@ interface HomeworkSubmission {
 interface Answer {
   question_index: number;
   question_text: string;
-  student_answer: number[];
-  correct_answer: number[];
+  student_answer: number[] | string;
+  correct_answer: number[] | string;
   is_correct: boolean;
   points_earned: number;
   max_points: number;
+  question_type?: string;
+  explanation?: string;
 }
 
 interface HomeworkData {
@@ -405,7 +407,13 @@ const HomeworkResults: React.FC = () => {
           </div>
           <div className="space-y-4">
             {submission.answers.map((answer, index) => {
-              const hasAnswer = answer.student_answer && answer.student_answer.length > 0;
+              const hasAnswer = answer.student_answer && (
+                Array.isArray(answer.student_answer) 
+                  ? answer.student_answer.length > 0 
+                  : typeof answer.student_answer === 'string' 
+                  ? answer.student_answer.trim().length > 0
+                  : false
+              );
               
               return (
                 <div
@@ -447,10 +455,21 @@ const HomeworkResults: React.FC = () => {
                         <div className="text-sm text-gray-600 mb-2">
                           <p><strong>Ваш ответ:</strong> {
                             hasAnswer 
-                              ? answer.student_answer.map(i => i + 1).join(', ')
+                              ? (Array.isArray(answer.student_answer) 
+                                  ? answer.student_answer.map(i => i + 1).join(', ')
+                                  : answer.student_answer)
                               : 'Не отвечено'
                           }</p>
-                          <p><strong>Правильный ответ:</strong> {answer.correct_answer.map(i => i + 1).join(', ')}</p>
+                          <p><strong>Правильный ответ:</strong> {
+                            Array.isArray(answer.correct_answer)
+                              ? answer.correct_answer.map(i => i + 1).join(', ')
+                              : answer.correct_answer
+                          }</p>
+                          {answer.explanation && (
+                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                              <p><strong className="text-blue-700">Объяснение:</strong> <span className="text-gray-700">{answer.explanation}</span></p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

@@ -13,6 +13,7 @@ interface QuestionData {
   timeLimit: number;
   options: string[];
   points: number;
+  textAnswer?: string;
 }
 
 const PlayQuiz: React.FC = () => {
@@ -46,6 +47,7 @@ const PlayQuiz: React.FC = () => {
   } | null>(null);
   const [userUid, setUserUid] = useState<string | null>(null);
   const [gameMode, setGameMode] = useState<'normal' | 'lockdown' | 'tab_tracking'>('normal');
+  const [disableCopy, setDisableCopy] = useState<boolean>(false);
   const [isKicked, setIsKicked] = useState(false);
   const [kickReason, setKickReason] = useState<string>('');
 
@@ -86,6 +88,9 @@ const PlayQuiz: React.FC = () => {
             setGameJoined(true);
             if (message.game_settings?.mode) {
               setGameMode(message.game_settings.mode);
+            }
+            if (message.game_settings?.disable_copy !== undefined) {
+              setDisableCopy(message.game_settings.disable_copy);
             }
             break;
             
@@ -330,10 +335,10 @@ const PlayQuiz: React.FC = () => {
     setTimerActive(false);
   };
 
-  const submitAnswer = (answerIndices: number[]) => {
+  const submitAnswer = (answer: number[] | string) => {
     if (ws && currentQuestion) {
       const answerMessage = { 
-        answer: answerIndices
+        answer: answer
       };
       ws.send(JSON.stringify(answerMessage));
     }
@@ -649,6 +654,7 @@ const PlayQuiz: React.FC = () => {
               questionData={currentQuestion} 
               timeLeft={timeLeft} 
               onSubmitAnswer={submitAnswer}
+              disableCopy={disableCopy}
             />
           ) : (
             /* Waiting Screen */

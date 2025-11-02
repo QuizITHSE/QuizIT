@@ -24,6 +24,7 @@ const GameSettings: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [gameMode, setGameMode] = useState<GameMode>('normal');
+  const [disableCopy, setDisableCopy] = useState<boolean>(false);
   
   const quizId = searchParams.get('id');
 
@@ -116,7 +117,7 @@ const GameSettings: React.FC = () => {
       return;
     }
     
-    navigate(`/host?id=${quizId}&group=${selectedGroup}&gameMode=${gameMode}`);
+    navigate(`/host?id=${quizId}&group=${selectedGroup}&gameMode=${gameMode}&disableCopy=${disableCopy}`);
   };
 
   const handleBack = () => {
@@ -356,6 +357,52 @@ const GameSettings: React.FC = () => {
                           Отслеживание переключений на другие вкладки/приложения
                         </p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Copy Prevention Option */}
+            {groups.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div 
+                  onClick={() => setDisableCopy(!disableCopy)}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    disableCopy
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+                        disableCopy
+                          ? 'border-blue-600 bg-blue-600'
+                          : 'border-gray-300'
+                      }`}
+                    >
+                      {disableCopy && (
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">Блокировка копирования</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Предотвращает копирование текста вопросов
+                      </p>
                     </div>
                   </div>
                 </div>
