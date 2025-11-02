@@ -79,7 +79,7 @@ class User:
     def __init__(self, ws_id, user_id, user_info):
         print(user_info)
         self.ws_id = ws_id
-        self.username = f"{user_info["name"]} {user_info["lastName"]}"
+        self.username = f"{user_info['name']} {user_info['lastName']}"
         self.teacher = user_info["isTeacher"]
         self.user_id = user_id
 
