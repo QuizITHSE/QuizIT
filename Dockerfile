@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code from Back directory
 COPY Back/main.py .
-COPY Back/quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json .
+
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app

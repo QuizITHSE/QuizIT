@@ -42,6 +42,7 @@ Thumbs.db
 # Docker
 Dockerfile
 .dockerignore
+docker-compose.yml
 
 # Frontend directories (exclude from backend build)
 Front/
@@ -51,8 +52,12 @@ client/
 public/
 node_modules/
 
-# Firebase credentials (use env vars in production, but keep for local dev)
-# Back/quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json
+# Firebase credentials (use env vars in production, never include in image)
+quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json
+firebase-adminsdk-*.json
+serviceAccount*.json
+credentials.json
+get_firebase_env.py
 
 # Logs
 *.log
