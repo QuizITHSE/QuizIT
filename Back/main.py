@@ -13,13 +13,18 @@ from google.oauth2 import service_account
 def get_firestore_client():
     # Look for Firebase key file in order of priority
     # 1. Check environment variable
-    firebase_key_path = os.getenv('FIREBASE_KEY_PATH')
+    firebase_key_path = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
+    print(f"DEBUG: FIREBASE_KEY_PATH env var = {firebase_key_path}")
     if firebase_key_path and os.path.exists(firebase_key_path):
+        print(f"Using Firebase key from FIREBASE_KEY_PATH: {firebase_key_path}")
         creds = service_account.Credentials.from_service_account_file(firebase_key_path)
         return firestore.Client(credentials=creds, project=creds.project_id)
     
     # 2. Check default location in app directory
     default_firebase_key = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
+    print(f"DEBUG: Checking for default key at: {default_firebase_key}")
+    print(f"DEBUG: Current directory: {os.getcwd()}")
+    print(f"DEBUG: File exists: {os.path.exists(default_firebase_key)}")
     if os.path.exists(default_firebase_key):
         print(f"Using local Firebase key file: {default_firebase_key}")
         creds = service_account.Credentials.from_service_account_file(default_firebase_key)
