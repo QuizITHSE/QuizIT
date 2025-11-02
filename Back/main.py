@@ -11,32 +11,27 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 
 def get_firestore_client():
+    # Look for Firebase key file in order of priority
+    # 1. Check environment variable
     firebase_key_path = os.getenv('FIREBASE_KEY_PATH')
     if firebase_key_path and os.path.exists(firebase_key_path):
         creds = service_account.Credentials.from_service_account_file(firebase_key_path)
         return firestore.Client(credentials=creds, project=creds.project_id)
     
-    firebase_credentials_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
-    if firebase_credentials_json:
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            f.write(firebase_credentials_json)
-            creds = service_account.Credentials.from_service_account_file(f.name)
-            os.unlink(f.name)
-            return firestore.Client(credentials=creds, project=creds.project_id)
-    
+    # 2. Check default location in app directory
     default_firebase_key = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
     if os.path.exists(default_firebase_key):
         print(f"Using local Firebase key file: {default_firebase_key}")
         creds = service_account.Credentials.from_service_account_file(default_firebase_key)
         return firestore.Client(credentials=creds, project=creds.project_id)
     
+    # 3. Try default credentials (for GCP environments)
     try:
         print("Using default Firebase credentials")
         return firestore.Client()
     except Exception as e:
         print(f"Error initializing Firebase: {e}")
-        print("Please set FIREBASE_KEY_PATH or FIREBASE_CREDENTIALS_JSON environment variable, or place the Firebase key file in the current directory")
+        print("Please provide Firebase key file via FIREBASE_KEY_PATH or place it in the app directory")
         raise
 
 db = get_firestore_client()

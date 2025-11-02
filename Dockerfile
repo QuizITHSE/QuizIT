@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code from Back directory
 COPY Back/main.py .
 
+# Note: Firebase credentials should be provided via volume mount
+# Mount the Firebase key file when running the container
+# Do NOT copy the Firebase key file into the image for security reasons
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
