@@ -390,9 +390,10 @@ const HomeworkQuiz: React.FC = () => {
         } else {
           // For choice questions, compare arrays
           hasAnswer = Array.isArray(studentAnswer) && studentAnswer.length > 0;
-          isCorrect = hasAnswer && 
-            studentAnswer.length === question.correct.length &&
-            studentAnswer.every(ans => question.correct.includes(ans));
+          if (hasAnswer && Array.isArray(studentAnswer)) {
+            isCorrect = studentAnswer.length === question.correct.length &&
+              studentAnswer.every((ans: number) => question.correct.includes(ans));
+          }
         }
         
         if (!hasAnswer) {

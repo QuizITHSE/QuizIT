@@ -54,7 +54,7 @@ const PlayQuiz: React.FC = () => {
   const gameCodeParam = searchParams.get('code');
 
   useEffect(() => {
-    const websocket = new WebSocket('ws://localhost:8765');
+    const websocket = new WebSocket('wss://thatisdreamer-quiz-it-back-1e40.twc1.net/ws');
     
     websocket.onopen = () => {
       setWsConnected(true);

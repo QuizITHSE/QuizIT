@@ -8,10 +8,24 @@ import json
 import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
 from google.oauth2 import service_account
 
 app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://quiz-it-omega.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_firestore_client():
     # Option 1: Try environment variable with JSON string (backup option)
