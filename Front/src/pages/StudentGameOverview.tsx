@@ -6,6 +6,7 @@ import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Trophy, Calendar, Target, AlertTriangle, CheckCircle, XCircle, Clock, BookOpen, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface UserGameResult {
   gameId: string;
@@ -269,32 +270,32 @@ const StudentGameOverview: React.FC = () => {
       
       const revisionQuizRef = await addDoc(collection(db, 'quizes'), revisionQuizData);
       
-      // Find the group for this student
+      // Find the group for this student (optional)
       const groupsQuery = query(
         collection(db, 'groups'),
         where('students', 'array-contains', auth.currentUser!.uid)
       );
       const groupsSnapshot = await getDocs(groupsQuery);
       
-      if (groupsSnapshot.empty) {
-        alert('Не найдена группа для вас');
-        setCreatingRevision(false);
-        return;
-      }
+      let groupId = null;
+      let groupName = 'None';
+      let teacherId = auth.currentUser.uid;
       
-      const group = groupsSnapshot.docs[0].data();
-      const groupId = groupsSnapshot.docs[0].id;
-      const teacherId = group.admin;
+      if (!groupsSnapshot.empty) {
+        const group = groupsSnapshot.docs[0].data();
+        groupId = groupsSnapshot.docs[0].id;
+        groupName = group.name;
+        teacherId = group.admin;
+      }
+      // If no group found, allow creating without group (groupId remains null)
       
       // Create homework assignment for this specific student
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + 7);
       
-      const homeworkData = {
+      const homeworkData: any = {
         quiz_id: revisionQuizRef.id,
         quiz_title: revisionQuizData.title,
-        group_id: groupId,
-        group_name: group.name,
         teacher_id: teacherId,
         created_at: new Date(),
         deadline: deadline,
@@ -306,9 +307,18 @@ const StudentGameOverview: React.FC = () => {
         assigned_to_students: [auth.currentUser.uid]
       };
       
+      // Only add group_id and group_name if group exists
+      if (groupId) {
+        homeworkData.group_id = groupId;
+        homeworkData.group_name = groupName;
+      }
+      
       await addDoc(collection(db, 'homework'), homeworkData);
       
-      alert(`Квиз повторения ошибок успешно создан и назначен вам!`);
+      // Показываем toast уведомление
+      toast.success('Квиз повторения ошибок успешно создан!', {
+        description: groupId ? 'Домашнее задание назначено вам' : 'Домашнее задание создано',
+      });
       
     } catch (error) {
       console.error('Error creating revision quiz:', error);

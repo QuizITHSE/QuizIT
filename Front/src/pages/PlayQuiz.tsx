@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDoc, doc } from 'firebase/firestore';
+import { getDoc, doc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, Users, Clock, Play, ArrowRight } from 'lucide-react';
@@ -45,6 +45,7 @@ const PlayQuiz: React.FC = () => {
     score: number;
     totalPlayers: number;
   } | null>(null);
+  const [finishedGameId, setFinishedGameId] = useState<string | null>(null);
   const [userUid, setUserUid] = useState<string | null>(null);
   const [gameMode, setGameMode] = useState<'normal' | 'lockdown' | 'tab_tracking'>('normal');
   const [disableCopy, setDisableCopy] = useState<boolean>(false);
@@ -137,6 +138,10 @@ const PlayQuiz: React.FC = () => {
             setCurrentQuestion(null);
             setRoundResult(null);
             setTimerActive(false);
+            // Find gameId by game code
+            if (gameCode || gameCodeParam) {
+              findGameIdByCode(gameCode || gameCodeParam || '');
+            }
             break;
             
           case 'kicked':
@@ -316,6 +321,22 @@ const PlayQuiz: React.FC = () => {
     return () => unsubscribe();
   }, [navigate]);
 
+  const findGameIdByCode = async (code: string) => {
+    try {
+      const gamesQuery = query(
+        collection(db, 'games'),
+        where('code', '==', code.toUpperCase()),
+        where('game_finished', '==', true)
+      );
+      const gamesSnapshot = await getDocs(gamesQuery);
+      if (!gamesSnapshot.empty) {
+        setFinishedGameId(gamesSnapshot.docs[0].id);
+      }
+    } catch (error) {
+      // Error finding gameId, button won't show
+    }
+  };
+
   const handleCodeSubmit = () => {
     if (codeInput.trim()) {
       setGameCode(codeInput.trim());
@@ -333,6 +354,7 @@ const PlayQuiz: React.FC = () => {
     setRoundResult(null);
     setCurrentQuestion(null);
     setTimerActive(false);
+    setFinishedGameId(null);
   };
 
   const submitAnswer = (answer: number[] | string) => {
@@ -560,21 +582,39 @@ const PlayQuiz: React.FC = () => {
                   Всего игроков: {gameFinished.totalPlayers}
                 </div>
                 
-                {/* Action Button */}
-                <Button
-                  onClick={() => navigate('/')}
-                  className={`px-8 py-3 text-lg font-bold ${
-                    gameFinished.placement === 1 
-                      ? 'bg-yellow-600 hover:bg-yellow-700' 
-                      : gameFinished.placement === 2
-                      ? 'bg-gray-600 hover:bg-gray-700'
-                      : gameFinished.placement === 3
-                      ? 'bg-orange-600 hover:bg-orange-700'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  } text-white cursor-pointer`}
-                >
-                  На главную
-                </Button>
+                {/* Action Buttons */}
+                <div className="flex flex-col md:flex-row gap-3 mt-4">
+                  {finishedGameId && userUid && (
+                    <Button
+                      onClick={() => navigate(`/student-quiz-details?gameId=${finishedGameId}&studentId=${userUid}`)}
+                      className={`px-6 py-3 text-base font-bold ${
+                        gameFinished.placement === 1 
+                          ? 'bg-purple-600 hover:bg-purple-700' 
+                          : gameFinished.placement === 2
+                          ? 'bg-purple-600 hover:bg-purple-700'
+                          : gameFinished.placement === 3
+                          ? 'bg-purple-600 hover:bg-purple-700'
+                          : 'bg-purple-600 hover:bg-purple-700'
+                      } text-white cursor-pointer`}
+                    >
+                      Посмотреть результаты
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => navigate('/')}
+                    className={`px-6 py-3 text-base font-bold ${
+                      gameFinished.placement === 1 
+                        ? 'bg-yellow-600 hover:bg-yellow-700' 
+                        : gameFinished.placement === 2
+                        ? 'bg-gray-600 hover:bg-gray-700'
+                        : gameFinished.placement === 3
+                        ? 'bg-orange-600 hover:bg-orange-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    } text-white cursor-pointer`}
+                  >
+                    На главную
+                  </Button>
+                </div>
               </div>
             </div>
           ) : roundResult ? (

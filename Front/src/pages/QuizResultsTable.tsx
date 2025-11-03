@@ -28,9 +28,14 @@ interface QuizResult {
 const QuizResultsTable: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const [isTeacher, setIsTeacher] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const handleStudentClick = (studentId: string) => {
-    navigate(`/student-quiz-details?gameId=${gameId}&studentId=${studentId}`);
+    // Teachers can view any student's details, students can only view their own
+    if (isTeacher || currentUserId === studentId) {
+      navigate(`/student-quiz-details?gameId=${gameId}&studentId=${studentId}`);
+    }
   };
   const [results, setResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,9 +79,10 @@ const QuizResultsTable: React.FC = () => {
       header: 'Имя участника',
       cell: (info) => {
         const row = info.row.original;
+        const canClick = isTeacher || currentUserId === row.user_id;
         return (
           <div 
-            className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+            className={`font-medium text-gray-900 ${canClick ? 'cursor-pointer hover:text-blue-600 transition-colors' : ''}`}
             onClick={() => handleStudentClick(row.user_id)}
           >
             {info.getValue()}
@@ -296,11 +302,25 @@ const QuizResultsTable: React.FC = () => {
         }
         
         const userData = userDoc.data();
+        setIsTeacher(userData.isTeacher || false);
+        setCurrentUserId(user.uid);
         
+        // Students can view results of games they participated in
         if (!userData.isTeacher) {
-          alert('Доступ запрещен. Только учителя могут просматривать результаты.');
-          navigate('/');
-          return;
+          // Check if user participated in this game
+          const gameDoc = await getDoc(doc(db, 'games', gameId || ''));
+          if (gameDoc.exists()) {
+            const gameData = gameDoc.data();
+            if (!gameData.players || !gameData.players.includes(user.uid)) {
+              alert('Доступ запрещен. Вы не участвовали в этой игре.');
+              navigate('/');
+              return;
+            }
+          } else {
+            alert('Игра не найдена.');
+            navigate('/');
+            return;
+          }
         }
         
         await fetchResults();

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { auth, db } from '@/lib/firebase';
 import QuizList from '@/components/QuizList';
 import QuizResults from '@/components/QuizResults';
-import { Play, Users, TrendingUp, BookOpen, Calendar, UserCheck, FileText, Clock, AlertTriangle } from 'lucide-react';
+import { Toaster } from '@/components/ui/sonner';
+import { Play, Users, TrendingUp, BookOpen, Calendar, UserCheck, FileText, Clock, AlertTriangle, Trophy } from 'lucide-react';
 
 function App() {
   const navigate = useNavigate();
@@ -35,6 +36,17 @@ function App() {
     status: 'Не начато' | 'Выполнено' | 'Просрочено' | 'Выполнено с опозданием' | 'Нарушение';
     submission?: any;
   }>>([]);
+  const [lastGameResult, setLastGameResult] = useState<{
+    gameId: string;
+    gameCode: string;
+    placement: number;
+    score: number;
+    total_players: number;
+    total_questions: number;
+    correct_answers: number;
+    finished_at: any;
+  } | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const createQuiz = async () => {
@@ -241,6 +253,67 @@ function App() {
     }
   };
 
+  const getLastGameResult = async (studentUid: string) => {
+    try {
+      const gamesQuery = query(
+        collection(db, 'games'),
+        where('players', 'array-contains', studentUid),
+        where('game_finished', '==', true)
+      );
+      
+      const gamesSnapshot = await getDocs(gamesQuery);
+      
+      if (gamesSnapshot.empty) {
+        setLastGameResult(null);
+        return;
+      }
+      
+      // Sort by finished_at to get the most recent
+      const games = gamesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          code: data.code,
+          finished_at: data.finished_at
+        };
+      }).sort((a, b) => {
+        const dateA = a.finished_at?.toDate ? a.finished_at.toDate() : new Date(a.finished_at || 0);
+        const dateB = b.finished_at?.toDate ? b.finished_at.toDate() : new Date(b.finished_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      if (games.length > 0) {
+        const latestGame = games[0];
+        
+        try {
+          const userResultDoc = await getDoc(
+            doc(db, 'games', latestGame.id, 'results', studentUid)
+          );
+          
+          if (userResultDoc.exists()) {
+            const resultData = userResultDoc.data();
+            setLastGameResult({
+              gameId: latestGame.id,
+              gameCode: latestGame.code || 'N/A',
+              placement: resultData.placement || 0,
+              score: resultData.score || 0,
+              total_players: resultData.total_players || 0,
+              total_questions: resultData.total_questions || 0,
+              correct_answers: resultData.correct_answers || 0,
+              finished_at: latestGame.finished_at
+            });
+            return;
+          }
+        } catch (error) {
+        }
+      }
+      
+      setLastGameResult(null);
+    } catch (error) {
+      setLastGameResult(null);
+    }
+  };
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -265,10 +338,12 @@ function App() {
         
         const userData = userDoc.data();
         setIsTeacher(userData.isTeacher);
+        setCurrentUserId(user.uid);
         
         if (!userData.isTeacher) {
           await checkActiveGames(user.uid); 
           await getStudentHomework(user.uid);
+          await getLastGameResult(user.uid);
         } else {
           await getTeacherGroups(user.uid);
         }
@@ -545,6 +620,53 @@ function App() {
               </div>
             )}
             
+            {/* Last Game Result */}
+            {lastGameResult && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
+                  <div className="flex items-center">
+                    <div className="bg-yellow-100 p-3 rounded-full mr-4 flex-shrink-0">
+                      <Trophy className="h-6 w-6 text-yellow-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-xl font-bold text-gray-900">Последняя игра</h2>
+                      <div className="flex flex-wrap items-center gap-3 mt-2">
+                        <div className="flex items-center">
+                          <span className="text-sm text-gray-600">Код: </span>
+                          <span className="text-sm font-mono font-bold text-blue-600 ml-1">{lastGameResult.gameCode}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-sm text-gray-600">Место: </span>
+                          <span className="text-sm font-bold text-gray-900 ml-1">
+                            {lastGameResult.placement === 1 ? '🥇 1' :
+                             lastGameResult.placement === 2 ? '🥈 2' :
+                             lastGameResult.placement === 3 ? '🥉 3' :
+                             `#${lastGameResult.placement}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-sm text-gray-600">Баллы: </span>
+                          <span className="text-sm font-bold text-blue-600 ml-1">{lastGameResult.score}/{lastGameResult.total_questions}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-sm text-gray-600">Правильных: </span>
+                          <span className="text-sm font-bold text-green-600 ml-1">{lastGameResult.correct_answers}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => navigate(`/student-quiz-details?gameId=${lastGameResult.gameId}&studentId=${currentUserId || ''}`)}
+                    variant="outline"
+                    className="w-full md:w-auto px-6 py-3 text-lg cursor-pointer"
+                  >
+                    <TrendingUp className="h-5 w-5 mr-2" />
+                    Посмотреть результаты
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             {/* Student Homework Section */}
             {studentHomework.length > 0 && (
               <div className="bg-white rounded-lg shadow-md p-6">
@@ -553,7 +675,7 @@ function App() {
                     <FileText className="h-6 w-6 text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Мои домашние задания</h2>
+                    <h2 className="text-xl font-bold text-gray-900">Мои домашниения</h2>
                     <p className="text-gray-600">
                       Задания, которые нужно выполнить
                     </p>
@@ -702,6 +824,7 @@ function App() {
           </div>
         )}
       </div>
+      <Toaster />
     </div>
   )
 }

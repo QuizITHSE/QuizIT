@@ -9,6 +9,7 @@ import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { Calendar, Clock, Users, Settings, BookOpen } from 'lucide-react';
 import type { Homework, Group, HomeworkMode } from '@/types/homework';
+import { toast } from 'sonner';
 
 interface AssignHomeworkModalProps {
   isOpen: boolean;
@@ -129,6 +130,11 @@ const AssignHomeworkModal: React.FC<AssignHomeworkModalProps> = ({
       };
       
       await addDoc(collection(db, 'homework'), homeworkData);
+      
+      // Показываем toast уведомление
+      toast.success('Домашнее задание успешно назначено!', {
+        description: `Квиз "${quizTitle}" назначен группе "${selectedGroup.name}"`,
+      });
       
       // Сбрасываем форму
       setSelectedGroupId('');

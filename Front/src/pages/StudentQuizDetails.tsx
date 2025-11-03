@@ -5,6 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, CheckCircle, XCircle, Clock, Trophy, BookOpen, Loader2, Download, FileSpreadsheet } from 'lucide-react';
+import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 interface Answer {
@@ -71,8 +72,9 @@ const StudentQuizDetails: React.FC = () => {
         
         const userData = userDoc.data();
         
-        if (!userData.isTeacher) {
-          alert('Доступ запрещен. Только учителя могут просматривать детальные результаты.');
+        // Students can only view their own results, teachers can view any student's results
+        if (!userData.isTeacher && user.uid !== studentId) {
+          alert('Доступ запрещен. Вы можете просматривать только свои результаты.');
           navigate('/');
           return;
         }
@@ -248,33 +250,53 @@ const StudentQuizDetails: React.FC = () => {
       
       const revisionQuizRef = await addDoc(collection(db, 'quizes'), revisionQuizData);
       
-      // Find the group for this student
-      const groupsQuery = query(
-        collection(db, 'groups'),
-        where('students', 'array-contains', studentId),
-        where('admin', '==', auth.currentUser.uid)
-      );
-      const groupsSnapshot = await getDocs(groupsQuery);
+      // Check if current user is a teacher or student
+      const currentUserDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      const isTeacher = currentUserDoc.exists() && currentUserDoc.data()?.isTeacher;
       
-      if (groupsSnapshot.empty) {
-        alert('Не найдена группа для этого студента');
-        setCreatingRevision(false);
-        return;
+      // Find the group for this student (only if teacher)
+      let groupId = null;
+      let groupName = 'None';
+      let teacherId = auth.currentUser.uid;
+      
+      if (isTeacher) {
+        const groupsQuery = query(
+          collection(db, 'groups'),
+          where('students', 'array-contains', studentId),
+          where('admin', '==', auth.currentUser.uid)
+        );
+        const groupsSnapshot = await getDocs(groupsQuery);
+        
+        if (!groupsSnapshot.empty) {
+          const group = groupsSnapshot.docs[0].data();
+          groupId = groupsSnapshot.docs[0].id;
+          groupName = group.name;
+        }
+      } else {
+        // For students, try to find their group
+        const groupsQuery = query(
+          collection(db, 'groups'),
+          where('students', 'array-contains', studentId)
+        );
+        const groupsSnapshot = await getDocs(groupsQuery);
+        
+        if (!groupsSnapshot.empty) {
+          const group = groupsSnapshot.docs[0].data();
+          groupId = groupsSnapshot.docs[0].id;
+          groupName = group.name;
+          teacherId = group.admin;
+        }
+        // If no group found, allow creating without group (groupId remains null)
       }
-      
-      const group = groupsSnapshot.docs[0].data();
-      const groupId = groupsSnapshot.docs[0].id;
       
       // Create homework assignment for this specific student
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + 7); // 7 days deadline
       
-      const homeworkData = {
+      const homeworkData: any = {
         quiz_id: revisionQuizRef.id,
         quiz_title: revisionQuizData.title,
-        group_id: groupId,
-        group_name: group.name,
-        teacher_id: auth.currentUser.uid,
+        teacher_id: teacherId,
         created_at: new Date(),
         deadline: deadline,
         total_questions: questionIds.length,
@@ -285,9 +307,18 @@ const StudentQuizDetails: React.FC = () => {
         assigned_to_students: [studentId]
       };
       
+      // Only add group_id and group_name if group exists
+      if (groupId) {
+        homeworkData.group_id = groupId;
+        homeworkData.group_name = groupName;
+      }
+      
       await addDoc(collection(db, 'homework'), homeworkData);
       
-      alert(`Квиз повторения ошибок успешно создан и назначен студенту ${result.username}!`);
+      // Показываем toast уведомление
+      toast.success('Квиз повторения ошибок успешно создан!', {
+        description: groupId ? `Назначен студенту ${result.username}` : 'Домашнее задание создано',
+      });
       
     } catch (error) {
       console.error('Error creating revision quiz:', error);
