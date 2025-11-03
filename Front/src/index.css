@@ -128,3 +128,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile optimization: make flex containers columns on mobile */
+@media (max-width: 768px) {
+  /* Apply to flex containers that don't have explicit direction classes */
+  div.flex:not([class*="flex-row"]):not([class*="flex-col"]):not([class*="md:flex"]) {
+    flex-direction: column !important;
+  }
+  
+  /* For flex containers with items-center and justify-between, add gap and stretch items */
+  div.flex.items-center.justify-between:not([class*="flex-row"]):not([class*="flex-col"]):not([class*="md:flex"]) {
+    align-items: stretch !important;
+    gap: 1rem !important;
+  }
+  
+  /* Ensure buttons and interactive elements in optimized flex containers take full width */
+  div.flex.items-center.justify-between:not([class*="flex-row"]):not([class*="flex-col"]) button,
+  div.flex.items-center.justify-between:not([class*="flex-row"]):not([class*="flex-col"]) .button,
+  div.flex.items-center.justify-between:not([class*="flex-row"]):not([class*="flex-col"]) a[role="button"] {
+    width: 100%;
+  }
+}

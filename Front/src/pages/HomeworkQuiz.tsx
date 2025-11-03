@@ -209,16 +209,42 @@ const HomeworkQuiz: React.FC = () => {
     if (currentQuiestion === 0 || !state.homework) return;
     if (state.homework.mode !== 'lockdown') return;
 
+    // Check if device is mobile
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                           (window.innerWidth <= 768);
+
+    // Helper function to get fullscreen element (cross-browser)
+    const getFullscreenElement = () => {
+      return (
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+    };
+
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        handleLockdownViolation();
+      const isFullscreen = !!getFullscreenElement();
+      if (!isFullscreen) {
+        if (isMobileDevice) {
+          // On mobile, just navigate away instead of reporting violation
+          navigate('/');
+        } else {
+          handleLockdownViolation();
+        }
       }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, [currentQuiestion, state.homework]);
 
@@ -226,11 +252,25 @@ const HomeworkQuiz: React.FC = () => {
     if (currentQuiestion === 0 || !state.homework) return;
     
     const mode = state.homework.mode;
-    if (mode !== 'tab_tracking') return;
+    if (mode !== 'tab_tracking' && mode !== 'lockdown') return;
+
+    // Check if device is mobile
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                           (window.innerWidth <= 768);
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setTabSwitches(prev => prev + 1);
+        if (mode === 'tab_tracking') {
+          // In tab_tracking mode, just track switches (always report violations)
+          setTabSwitches(prev => prev + 1);
+        } else if (mode === 'lockdown') {
+          if (isMobileDevice) {
+            // On mobile in lockdown mode, just navigate away instead of reporting violation
+            navigate('/');
+          } else {
+            handleLockdownViolation();
+          }
+        }
       }
     };
 
@@ -239,15 +279,45 @@ const HomeworkQuiz: React.FC = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentQuiestion, state.homework]);
+  }, [currentQuiestion, state.homework, navigate]);
+
+  // Helper function to check if fullscreen is supported
+  const isFullscreenSupported = () => {
+    return !!(
+      document.fullscreenEnabled ||
+      (document as any).webkitFullscreenEnabled ||
+      (document as any).mozFullScreenEnabled ||
+      (document as any).msFullscreenEnabled
+    );
+  };
+
+  // Helper function to request fullscreen (cross-browser)
+  const requestFullscreen = async (elem: HTMLElement) => {
+    if (elem.requestFullscreen) {
+      return elem.requestFullscreen();
+    } else if ((elem as any).webkitRequestFullscreen) {
+      return (elem as any).webkitRequestFullscreen();
+    } else if ((elem as any).mozRequestFullScreen) {
+      return (elem as any).mozRequestFullScreen();
+    } else if ((elem as any).msRequestFullscreen) {
+      return (elem as any).msRequestFullscreen();
+    }
+    throw new Error('Fullscreen API is not supported');
+  };
 
   const handleStartQuiz = async () => {
     if (state.homework?.mode === 'lockdown') {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch (err) {
-        alert('Не удалось перейти в полноэкранный режим. Режим блокировки требует полноэкранный режим для начала.');
-        return;
+      if (isFullscreenSupported()) {
+        try {
+          await requestFullscreen(document.documentElement);
+        } catch (err) {
+          console.error('Fullscreen error:', err);
+          // On mobile, fullscreen might not be supported, allow quiz to continue
+          // Show a warning but don't block the quiz
+        }
+      } else {
+        // Fullscreen is not supported (likely mobile), allow quiz to continue
+        console.warn('Fullscreen API is not supported on this device');
       }
     }
     
@@ -458,8 +528,32 @@ const HomeworkQuiz: React.FC = () => {
       );
 
       
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
+      // Helper function to exit fullscreen (cross-browser)
+      const exitFullscreen = async () => {
+        if (document.exitFullscreen) {
+          return document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          return (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          return (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          return (document as any).msExitFullscreen();
+        }
+      };
+
+      const isFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+
+      if (isFullscreen) {
+        try {
+          await exitFullscreen();
+        } catch (err) {
+          console.error('Error exiting fullscreen:', err);
+        }
       }
       
       alert(`Квиз успешно отправлен!\n\nВаш результат:\n${correctAnswers} из ${totalQuestions} правильных ответов\nБаллы: ${score} из ${maxScore}\nПроцент: ${percentage}%`);

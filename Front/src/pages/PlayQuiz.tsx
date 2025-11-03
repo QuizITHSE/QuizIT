@@ -233,45 +233,126 @@ const PlayQuiz: React.FC = () => {
       return;
     }
 
+    // Check if device is mobile
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                           (window.innerWidth <= 768);
+
     let blurTimeout: NodeJS.Timeout | null = null;
 
     const handleVisibilityChange = () => {
-      
-      if (document.hidden && (gameMode === 'lockdown' || gameMode === 'tab_tracking')) {
-        reportCheating();
+      if (document.hidden) {
+        if (gameMode === 'lockdown') {
+          if (isMobileDevice) {
+            // On mobile in lockdown mode, just disconnect instead of reporting cheating
+            if (ws) {
+              ws.close();
+            }
+            navigate('/');
+          } else {
+            reportCheating();
+          }
+        } else if (gameMode === 'tab_tracking') {
+          // In tab_tracking mode, always report violations regardless of device
+          reportCheating();
+        }
       }
     };
 
     const handleBlur = () => {
-      
       if (blurTimeout) {
         clearTimeout(blurTimeout);
       }
       
       blurTimeout = setTimeout(() => {
-        if (document.hidden && (gameMode === 'lockdown' || gameMode === 'tab_tracking')) {
-          reportCheating();
+        if (document.hidden) {
+          if (gameMode === 'lockdown') {
+            if (isMobileDevice) {
+              // On mobile in lockdown mode, just disconnect instead of reporting cheating
+              if (ws) {
+                ws.close();
+              }
+              navigate('/');
+            } else {
+              reportCheating();
+            }
+          } else if (gameMode === 'tab_tracking') {
+            // In tab_tracking mode, always report violations regardless of device
+            reportCheating();
+          }
         }
       }, 500);
     };
 
+    // Helper function to check if fullscreen is supported
+    const isFullscreenSupported = () => {
+      return !!(
+        document.fullscreenEnabled ||
+        (document as any).webkitFullscreenEnabled ||
+        (document as any).mozFullScreenEnabled ||
+        (document as any).msFullscreenEnabled
+      );
+    };
+
+    // Helper function to get fullscreen element
+    const getFullscreenElement = () => {
+      return (
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+    };
+
+    // Helper function to request fullscreen
+    const requestFullscreen = async (elem: HTMLElement) => {
+      if (elem.requestFullscreen) {
+        return elem.requestFullscreen();
+      } else if ((elem as any).webkitRequestFullscreen) {
+        return (elem as any).webkitRequestFullscreen();
+      } else if ((elem as any).mozRequestFullScreen) {
+        return (elem as any).mozRequestFullScreen();
+      } else if ((elem as any).msRequestFullscreen) {
+        return (elem as any).msRequestFullscreen();
+      }
+      throw new Error('Fullscreen API is not supported');
+    };
+
     const handleFullscreenChange = () => {
-      
-      if (gameMode === 'lockdown' && !document.fullscreenElement) {
-        reportCheating();
+      const isFullscreen = !!getFullscreenElement();
+      if (gameMode === 'lockdown' && !isFullscreen) {
+        if (isMobileDevice) {
+          // On mobile, just disconnect instead of reporting cheating
+          if (ws) {
+            ws.close();
+          }
+          navigate('/');
+        } else {
+          reportCheating();
+        }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
+    
+    // Add fullscreen change listeners for all browsers
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-
-    if (gameMode === 'lockdown' && gameJoined && !document.fullscreenElement) {
-      const elem = document.documentElement;
-      elem.requestFullscreen().catch((err) => {
-        alert('Для режима блокировки требуется полноэкранный режим. Пожалуйста, разрешите полноэкранный режим.');
-      });
+    if (gameMode === 'lockdown' && gameJoined && !getFullscreenElement()) {
+      if (isFullscreenSupported()) {
+        const elem = document.documentElement;
+        requestFullscreen(elem).catch((err) => {
+          console.error('Fullscreen error:', err);
+          // On mobile, fullscreen might not be supported, so we don't block the quiz
+          // The quiz will continue but without fullscreen protection
+        });
+      } else {
+        // Fullscreen is not supported (likely mobile), allow quiz to continue
+        console.warn('Fullscreen API is not supported on this device');
+      }
     }
 
     return () => {
@@ -281,6 +362,9 @@ const PlayQuiz: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, [gameJoined, gameMode, reportCheating, ws]);
 
