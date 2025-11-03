@@ -594,12 +594,12 @@ function App() {
             {/* Quick Join Button for Students */}
             {activeGame && (
               <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
                   <div className="flex items-center">
-                    <div className="bg-green-100 p-3 rounded-full mr-4">
+                    <div className="bg-green-100 p-3 rounded-full mr-4 flex-shrink-0">
                       <Play className="h-6 w-6 text-green-600" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h2 className="text-xl font-bold text-gray-900">Активная игра!</h2>
                       <p className="text-gray-600">
                         В группе "{activeGame.groupName}" идет квиз
@@ -611,7 +611,7 @@ function App() {
                   </div>
                   <Button
                     onClick={() => navigate(`/play?code=${activeGame.code}`)}
-                    className="bg-green-600 hover:bg-green-700 px-6 py-3 text-lg cursor-pointer"
+                    className="w-full md:w-auto bg-green-600 hover:bg-green-700 px-6 py-3 text-lg cursor-pointer"
                   >
                     <Play className="h-5 w-5 mr-2" />
                     Присоединиться
