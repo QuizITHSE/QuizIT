@@ -3,41 +3,65 @@ import string
 import os
 from array import ArrayType
 
-import websockets
 import asyncio
 import json
 import datetime
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from google.cloud import firestore
 from google.oauth2 import service_account
 
+app = FastAPI()
+
 def get_firestore_client():
-    # Look for Firebase key file in order of priority
-    # 1. Check environment variable
-    firebase_key_path = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
-    print(f"DEBUG: FIREBASE_KEY_PATH env var = {firebase_key_path}")
-    if firebase_key_path and os.path.exists(firebase_key_path):
-        print(f"Using Firebase key from FIREBASE_KEY_PATH: {firebase_key_path}")
-        creds = service_account.Credentials.from_service_account_file(firebase_key_path)
-        return firestore.Client(credentials=creds, project=creds.project_id)
+    # Option 1: Try environment variable with JSON string (backup option)
+    firebase_credentials_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+    if firebase_credentials_json:
+        try:
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                f.write(firebase_credentials_json)
+                temp_path = f.name
+            
+            creds = service_account.Credentials.from_service_account_file(temp_path)
+            os.unlink(temp_path)
+            print("Using Firebase credentials from FIREBASE_CREDENTIALS_JSON environment variable")
+            return firestore.Client(credentials=creds, project=creds.project_id)
+        except Exception as e:
+            print(f"Error reading Firebase from environment variable: {e}")
+            print("Falling back to file-based credentials...")
     
-    # 2. Check default location in app directory
-    default_firebase_key = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
-    print(f"DEBUG: Checking for default key at: {default_firebase_key}")
-    print(f"DEBUG: Current directory: {os.getcwd()}")
-    print(f"DEBUG: File exists: {os.path.exists(default_firebase_key)}")
-    if os.path.exists(default_firebase_key):
-        print(f"Using local Firebase key file: {default_firebase_key}")
-        creds = service_account.Credentials.from_service_account_file(default_firebase_key)
-        return firestore.Client(credentials=creds, project=creds.project_id)
+    # Option 2: Use Firebase key file from the same directory as main.py
+    # Get the directory where main.py is located
+    main_dir = os.path.dirname(os.path.abspath(__file__))
+    firebase_key_file = os.path.join(main_dir, "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json")
     
-    # 3. Try default credentials (for GCP environments)
-    try:
-        print("Using default Firebase credentials")
-        return firestore.Client()
-    except Exception as e:
-        print(f"Error initializing Firebase: {e}")
-        print("Please provide Firebase key file via FIREBASE_KEY_PATH or place it in the app directory")
-        raise
+    # Also try current working directory as fallback
+    if not os.path.exists(firebase_key_file):
+        firebase_key_file = os.path.join(os.getcwd(), "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json")
+    
+    print(f"DEBUG: Looking for Firebase key at: {firebase_key_file}")
+    print(f"DEBUG: Current working directory: {os.getcwd()}")
+    print(f"DEBUG: Main.py directory: {main_dir}")
+    print(f"DEBUG: File exists: {os.path.exists(firebase_key_file)}")
+    
+    if not os.path.exists(firebase_key_file):
+        # List files in main.py directory for debugging
+        try:
+            files_in_dir = os.listdir(main_dir)
+            print(f"DEBUG: Files in main.py directory: {files_in_dir}")
+        except:
+            pass
+        
+        raise FileNotFoundError(
+            f"Firebase key file 'quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json' not found. "
+            f"Searched in: {main_dir} and {os.getcwd()}. "
+            f"Please ensure the file is in the same directory as main.py or set FIREBASE_CREDENTIALS_JSON environment variable"
+        )
+    
+    print(f"Using Firebase key file: {firebase_key_file}")
+    creds = service_account.Credentials.from_service_account_file(firebase_key_file)
+    return firestore.Client(credentials=creds, project=creds.project_id)
 
 db = get_firestore_client()
 
@@ -122,11 +146,11 @@ class Lobby:
         db.collection("games").document(self.game_id).update({
             "players": firestore.ArrayUnion(self.players_ids)
         })
-        await self.host.ws_id.send(json.dumps({"players": [el.username for el in self.players]}))
+        await self.host.ws_id.send_text(json.dumps({"players": [el.username for el in self.players]}))
 
     async def broadcast(self, message):
         for el in self.players:
-            await el.ws_id.send(message)
+            await el.ws_id.send_text(message)
 
     async def start_game(self):
         print(self.quiz)
@@ -140,19 +164,19 @@ class Lobby:
         # Add points info to question object
         question_obj["points"] = question_points
         
-        await self.host.ws_id.send(json.dumps(question_obj))
+        await self.host.ws_id.send_text(json.dumps(question_obj))
         await self.broadcast(json.dumps(question_obj))
         asyncio.create_task(on_question_timer_end(self.current_question, self, self.quiz["questions"][self.current_question]))
 
     async def save_answer(self, user: User, answer):
         if not self.currently_round:
-            await user.ws_id.send(json.dumps({"type": "error", "message": "Round is not active!"}))
+            await user.ws_id.send_text(json.dumps({"type": "error", "message": "Round is not active!"}))
             return
         
         # Check if user already answered this question
         for existing_answer in self.answers:
             if existing_answer["user"].user_id == user.user_id:
-                await user.ws_id.send(json.dumps({"type": "error", "message": "You already answered this question!"}))
+                await user.ws_id.send_text(json.dumps({"type": "error", "message": "You already answered this question!"}))
                 return
         
         self.answers.append({"user": user, "answer": answer})
@@ -174,9 +198,9 @@ class Lobby:
         
         if is_correct:
             self.score_board[user.user_id][1] += question_points
-            await user.ws_id.send(json.dumps({"correct": True, "points_earned": question_points}))
+            await user.ws_id.send_text(json.dumps({"correct": True, "points_earned": question_points}))
         else:
-            await user.ws_id.send(json.dumps({"correct": False, "points_earned": 0}))
+            await user.ws_id.send_text(json.dumps({"correct": False, "points_earned": 0}))
         
         # Store the answer details for this user
         answer_record = {
@@ -197,8 +221,8 @@ class Lobby:
         # Send updated scoreboard to all players immediately
         await self.broadcast(json.dumps({"type": "scoreboard", "data": self.score_board}))
         
-        await self.host.ws_id.send(json.dumps({"answers": len(self.answers)}))
-        await user.ws_id.send(json.dumps({"type": "answer_saved", "message": "Saved! Waiting for end of round...."}))
+        await self.host.ws_id.send_text(json.dumps({"answers": len(self.answers)}))
+        await user.ws_id.send_text(json.dumps({"type": "answer_saved", "message": "Saved! Waiting for end of round...."}))
         
         # Check if everyone has answered
         if len(self.answers) == len(self.players):
@@ -256,7 +280,7 @@ class Lobby:
         info_for_host["total_earned_points"] = info_for_host["right"] * question_points
         
         # Send results to host
-        await self.host.ws_id.send(json.dumps({"type": "round_results", "data": info_for_host}))
+        await self.host.ws_id.send_text(json.dumps({"type": "round_results", "data": info_for_host}))
         
         # Send round results with answer correctness and scoreboard to all players
         answered_user_ids = set()
@@ -269,7 +293,7 @@ class Lobby:
                 is_correct = answer == correct_answer
             answered_user_ids.add(answer_info["user"].user_id)
             
-            await answer_info["user"].ws_id.send(json.dumps({
+            await answer_info["user"].ws_id.send_text(json.dumps({
                 "type": "round_ended",
                 "correct": is_correct,
                 "scoreboard": self.score_board,
@@ -279,7 +303,7 @@ class Lobby:
         # Notify players who did not answer in time and record missed answers
         for player in self.players:
             if player.user_id not in answered_user_ids:
-                await player.ws_id.send(json.dumps({
+                await player.ws_id.send_text(json.dumps({
                     "type": "round_ended",
                     "correct": False,
                     "missed": True,
@@ -320,7 +344,7 @@ class Lobby:
         """Start the next round (only called by host)"""
         if self.current_question >= len(self.quiz["questions"]) - 1:
             # This is the last question, don't auto-finish game
-            await self.host.ws_id.send(json.dumps({"type": "last_question_completed", "message": "All questions completed! Use 'show_results' to view final results."}))
+            await self.host.ws_id.send_text(json.dumps({"type": "last_question_completed", "message": "All questions completed! Use 'show_results' to view final results."}))
             return
         
         self.current_question += 1
@@ -332,7 +356,7 @@ class Lobby:
         # Add points info to question object
         question_obj["points"] = question_points
         
-        await self.host.ws_id.send(json.dumps(question_obj))
+        await self.host.ws_id.send_text(json.dumps(question_obj))
         await self.broadcast(json.dumps(question_obj))
         asyncio.create_task(on_question_timer_end(self.current_question, self, self.quiz["questions"][self.current_question]))
 
@@ -382,7 +406,7 @@ class Lobby:
         for player in self.players:
             player_placement = next((p for p in leaderboard if p["user_id"] == player.user_id), None)
             if player_placement:
-                await player.ws_id.send(json.dumps({
+                await player.ws_id.send_text(json.dumps({
                     "type": "game_finished",
                     "placement": player_placement["place"],
                     "score": player_placement["score"],
@@ -390,7 +414,7 @@ class Lobby:
                 }))
         
         # Send full leaderboard to host (include tab switches if tracking was enabled)
-        await self.host.ws_id.send(json.dumps({
+        await self.host.ws_id.send_text(json.dumps({
             "type": "game_finished",
             "leaderboard": leaderboard,
             "total_questions": len(self.quiz["questions"]),
@@ -434,7 +458,7 @@ async def on_question_timer_end(dispatch_round_number, lobby: Lobby, question):
         # Check if this was the last question
         if lobby.current_question >= len(lobby.quiz["questions"]) - 1:
             # Last question completed, wait for host to show results
-            await lobby.host.ws_id.send(json.dumps({"type": "last_question_completed", "message": "All questions completed! Use 'show_results' to view final results."}))
+            await lobby.host.ws_id.send_text(json.dumps({"type": "last_question_completed", "message": "All questions completed! Use 'show_results' to view final results."}))
 
 
 
@@ -514,7 +538,7 @@ async def cleanup_user(websocket):
                     
                     # Update players list for host
                     if lobby.host and lobby.host.ws_id:
-                        await lobby.host.ws_id.send(json.dumps({
+                        await lobby.host.ws_id.send_text(json.dumps({
                             "type": "players_updated",
                             "players": [player.username for player in lobby.players]
                         }))
@@ -527,7 +551,8 @@ async def cleanup_user(websocket):
         
         # Remove user from USERS
         del USERS[websocket]
-        print(f"Cleaned up user data for: {websocket.remote_address}")
+        client_info = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+        print(f"Cleaned up user data for: {client_info}")
 
 def create_game(user: User, group_id, game_type, quiz_id):
     game_code = generate_unique_game_code(6)
@@ -555,32 +580,35 @@ def fetch_quiz(quiz_id):
     return final
 
 
-async def main_handler(websocket):
+async def main_handler(websocket: WebSocket):
     """Main WebSocket handler."""
+    await websocket.accept()
     # Log when a client connects
-    print(f"New connection from: {websocket.remote_address}")
-    await websocket.send(json.dumps({"type": "welcome", "message": "WELCOME! you have to auth first though..."}))
+    client_info = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+    print(f"New connection from: {client_info}")
+    await websocket.send_text(json.dumps({"type": "welcome", "message": "WELCOME! you have to auth first though..."}))
     USERS[websocket] = {"auth": False, "user": None, "lobby": None}
     print(USERS)
     try:
         # Handle incoming messages
-        async for message in websocket:
+        while True:
+            message = await websocket.receive_text()
             user_obj = USERS[websocket]
             message = json.loads(message)
 
 
             if user_obj["auth"] is False:
-                await websocket.send(json.dumps({"type": "auth_attempt", "message": "trying to auth you ahh"}))
+                await websocket.send_text(json.dumps({"type": "auth_attempt", "message": "trying to auth you ahh"}))
                 user = get_user_info(message["user_id"])
                 if user:
                     user_obj["auth"] = True
                     user_obj["user"] = User(websocket, message["user_id"], user)
-                    await websocket.send(json.dumps({"type": "auth_success", "message": f"yeah wsg wats the haps {user['name']}"}))
+                    await websocket.send_text(json.dumps({"type": "auth_success", "message": f"yeah wsg wats the haps {user['name']}"}))
                 else:
-                    await websocket.close(code=1008, reason="you ain't no hacker BYE!")
+                    await websocket.close(code=1008)
 
             if user_obj["user"].teacher and "quiz" in message and not user_obj["lobby"]:
-                await websocket.send(json.dumps({"type": "creating_game", "message": "creating..."}))
+                await websocket.send_text(json.dumps({"type": "creating_game", "message": "creating..."}))
                 game_type = message.get("game_type", {})
                 quiz_id = message.get("quiz")
                 code, game_id = create_game(user_obj["user"], message.get("group"), game_type, quiz_id)
@@ -588,13 +616,13 @@ async def main_handler(websocket):
                 quiz = fetch_quiz(quiz_id)
                 user_obj["lobby"] = Lobby(user_obj["user"], quiz, game_id, code, game_type)
                 LOBBIES.append(user_obj["lobby"])
-                await websocket.send(json.dumps({"type": "game_created", "message": f"done! room code: {code}", "code": code}))
-                await websocket.send(json.dumps({"type": "quiz_info", "message": f"quiz questions: {quiz['questions']}", "questions": quiz["questions"]}))
+                await websocket.send_text(json.dumps({"type": "game_created", "message": f"done! room code: {code}", "code": code}))
+                await websocket.send_text(json.dumps({"type": "quiz_info", "message": f"quiz questions: {quiz['questions']}", "questions": quiz["questions"]}))
                 print(LOBBIES)
                 print(USERS)
 
             if "code" in message and not user_obj["lobby"]:
-                await websocket.send(json.dumps({"type": "joining", "message": "joining..."}))
+                await websocket.send_text(json.dumps({"type": "joining", "message": "joining..."}))
                 
                 # Find lobby by code
                 target_lobby = None
@@ -606,7 +634,7 @@ async def main_handler(websocket):
                 if target_lobby:
                     await target_lobby.connect(user_obj["user"])
                     user_obj["lobby"] = target_lobby
-                    await websocket.send(json.dumps({
+                    await websocket.send_text(json.dumps({
                         "type": "joined", 
                         "message": "Joined! Waiting for start", 
                         "game_settings": {
@@ -616,7 +644,7 @@ async def main_handler(websocket):
                     }))
                     print(target_lobby.quiz["title"])
                 else:
-                    await websocket.send(json.dumps({"type": "error", "message": "Invalid room code!"}))
+                    await websocket.send_text(json.dumps({"type": "error", "message": "Invalid room code!"}))
 
             if "start" in message and user_obj["lobby"].host == user_obj["user"]:
                 await user_obj["lobby"].start_game()
@@ -662,7 +690,7 @@ async def main_handler(websocket):
                         
                         # Notify host about tab switch
                         try:
-                            await lobby.host.ws_id.send(json.dumps({
+                            await lobby.host.ws_id.send_text(json.dumps({
                                 "type": "tab_switch_report",
                                 "username": user.username,
                                 "user_id": user.user_id,
@@ -674,7 +702,7 @@ async def main_handler(websocket):
                         
                         # Acknowledge to the student
                         try:
-                            await user.ws_id.send(json.dumps({
+                            await user.ws_id.send_text(json.dumps({
                                 "type": "tab_switch_recorded",
                                 "message": "Переключение вкладки зафиксировано"
                             }))
@@ -688,7 +716,7 @@ async def main_handler(websocket):
                         
                         # Notify the player they are being removed
                         try:
-                            await user.ws_id.send(json.dumps({
+                            await user.ws_id.send_text(json.dumps({
                                 "type": "kicked",
                                 "reason": "lockdown_violation",
                                 "message": "Вы были удалены из игры за нарушение режима блокировки (выход из полноэкранного режима)"
@@ -698,7 +726,7 @@ async def main_handler(websocket):
                         
                         # Notify host about the violation
                         try:
-                            await lobby.host.ws_id.send(json.dumps({
+                            await lobby.host.ws_id.send_text(json.dumps({
                                 "type": "player_kicked",
                                 "username": user.username,
                                 "user_id": user.user_id,
@@ -733,7 +761,7 @@ async def main_handler(websocket):
                         
                         # Update host's player list
                         try:
-                            await lobby.host.ws_id.send(json.dumps({
+                            await lobby.host.ws_id.send_text(json.dumps({
                                 "type": "players_updated",
                                 "players": [player.username for player in lobby.players]
                             }))
@@ -742,7 +770,7 @@ async def main_handler(websocket):
                         
                         # Close the user's connection
                         try:
-                            await websocket.close(code=1008, reason="Lockdown mode violation")
+                            await websocket.close(code=1008)
                             print(f"🔌 Closed websocket connection")
                         except Exception as e:
                             print(f"❌ Error closing websocket: {e}")
@@ -758,24 +786,28 @@ async def main_handler(websocket):
 
 
 
-    except (websockets.exceptions.ConnectionClosed, websockets.exceptions.WebSocketException, Exception) as e:
-        # Log when the client disconnects with error
-        print(f"Connection closed with error: {websocket.remote_address}, reason: {e}")
+    except WebSocketDisconnect:
+        # Log when the client disconnects
+        client_info = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+        print(f"Connection closed: {client_info}")
+    except Exception as e:
+        # Log other errors
+        client_info = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+        print(f"Connection closed with error: {client_info}, reason: {e}")
     finally:
         # Always clean up user data when connection closes (normal or error)
-        print(f"Cleaning up connection: {websocket.remote_address}")
+        client_info = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+        print(f"Cleaning up connection: {client_info}")
         await cleanup_user(websocket)
 
 
-async def main():
-    """Main entry point for the WebSocket server."""
-    host = os.getenv('HOST', '0.0.0.0')
-    port = int(os.getenv('PORT', 8765))
-    
-    start_server = await websockets.serve(main_handler, host, port)
-    print(f"WebSocket server started on ws://{host}:{port}")
-    await start_server.wait_closed()
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """FastAPI WebSocket endpoint."""
+    await main_handler(websocket)
 
-# Use asyncio.run() to start the event loop
-if __name__ == "__main__":
-    asyncio.run(main())
+
+@app.get("/")
+async def root():
+    """Health check endpoint."""
+    return JSONResponse({"status": "ok", "service": "QuizIT Backend"})

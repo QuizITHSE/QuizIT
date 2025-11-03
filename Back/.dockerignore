@@ -53,8 +53,10 @@ public/
 node_modules/
 
 # Firebase credentials (use env vars in production, never include in image)
-quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json
+# Note: quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json is needed in the image
+# Exclude all firebase keys EXCEPT the one we need
 firebase-adminsdk-*.json
+!quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json
 serviceAccount*.json
 credentials.json
 get_firebase_env.py

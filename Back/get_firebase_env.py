@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-Скрипт для конвертации Firebase ключа в отдельные переменные окружения
+Скрипт для конвертации Firebase ключа в переменную окружения FIREBASE_CREDENTIALS_JSON
 Использование: python get_firebase_env.py
 """
 
 import json
 import os
-import base64
 
-def get_firebase_env_vars():
-    """Читает Firebase ключ и возвращает отдельные переменные окружения"""
+def get_firebase_env_var():
+    """Читает Firebase ключ и возвращает JSON строку для переменной окружения"""
     
     # Путь к Firebase ключу
     firebase_key_path = "quizit-57a37-firebase-adminsdk-fbsvc-fd321561cc.json"
@@ -24,31 +23,18 @@ def get_firebase_env_vars():
         with open(firebase_key_path, 'r', encoding='utf-8') as f:
             firebase_data = json.load(f)
         
-        print("✅ Firebase ключ успешно прочитан!")
-        print("\n📋 Добавьте эти переменные окружения в вашу платформу хостинга:\n")
-        
-        # Кодируем длинные значения в base64 чтобы уложиться в лимит
-        for key, value in firebase_data.items():
-            value_str = str(value) if value else ""
-            
-            # Для private_key и других длинных значений используем base64
-            if len(value_str) > 200:
-                encoded = base64.b64encode(value_str.encode('utf-8')).decode('utf-8')
-                print(f"FIREBASE_{key.upper()}_B64={encoded}")
-            else:
-                print(f"FIREBASE_{key.upper()}={value_str}")
-        
-        print("\n" + "="*80)
-        print("📝 Альтернативный вариант: JSON строка (может быть слишком длинной):")
-        print("="*80)
+        # Конвертируем в строку (минифицированный JSON)
         firebase_json_string = json.dumps(firebase_data, separators=(',', ':'))
-        if len(firebase_json_string) <= 255:
-            print(f"\nFIREBASE_CREDENTIALS_JSON={firebase_json_string}")
-        else:
-            print(f"\n⚠️  JSON слишком длинный ({len(firebase_json_string)} символов)")
-            print("Используйте base64 кодированные переменные выше")
         
-        return firebase_data
+        print("✅ Firebase ключ успешно прочитан!")
+        print(f"\n📋 Длина JSON строки: {len(firebase_json_string)} символов")
+        print("\n📋 Добавьте эту переменную окружения в вашу платформу хостинга:\n")
+        print(f"FIREBASE_CREDENTIALS_JSON={firebase_json_string}")
+        
+        print("\n💡 Или скопируйте только значение (без FIREBASE_CREDENTIALS_JSON=):")
+        print(firebase_json_string)
+        
+        return firebase_json_string
         
     except json.JSONDecodeError as e:
         print(f"❌ Ошибка при чтении JSON файла: {e}")
@@ -58,4 +44,4 @@ def get_firebase_env_vars():
         return None
 
 if __name__ == "__main__":
-    get_firebase_env_vars()
+    get_firebase_env_var()
