@@ -62,7 +62,7 @@ const GameResults: React.FC<GameResultsProps> = ({ results }) => {
         
         {/* Game Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-          <div className="bg-white bg-opacity-20 rounded-lg p-4">
+          <div className="bg-black bg-opacity-30 rounded-lg p-4 backdrop-blur-sm">
             <div className="flex items-center justify-center mb-2">
               <Target className="h-6 w-6 mr-2 text-white" />
               <span className="text-lg font-semibold text-white">Вопросов</span>
@@ -70,7 +70,7 @@ const GameResults: React.FC<GameResultsProps> = ({ results }) => {
             <div className="text-3xl font-bold text-white">{total_questions}</div>
           </div>
           
-          <div className="bg-white bg-opacity-20 rounded-lg p-4">
+          <div className="bg-black bg-opacity-30 rounded-lg p-4 backdrop-blur-sm">
             <div className="flex items-center justify-center mb-2">
               <Users className="h-6 w-6 mr-2 text-white" />
               <span className="text-lg font-semibold text-white">Игроков</span>
@@ -78,7 +78,7 @@ const GameResults: React.FC<GameResultsProps> = ({ results }) => {
             <div className="text-3xl font-bold text-white">{total_players}</div>
           </div>
           
-          <div className="bg-white bg-opacity-20 rounded-lg p-4">
+          <div className="bg-black bg-opacity-30 rounded-lg p-4 backdrop-blur-sm">
             <div className="flex items-center justify-center mb-2">
               <Award className="h-6 w-6 mr-2 text-white" />
               <span className="text-lg font-semibold text-white">Средний балл</span>

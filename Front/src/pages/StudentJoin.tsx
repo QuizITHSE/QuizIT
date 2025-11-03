@@ -46,12 +46,12 @@ const StudentJoin = () => {
     }
 
     return (
-        <div className="min-h-screen w-full montserrat-600 flex justify-center items-center flex-col">
-            <div className="w-[500px] p-5 flex flex-col gap-5 items-center justify-center rounded-lg border-2 bordeer-grey-300 overflow-hidden">
-                <h1 className='text-2xl font-bold'>Присоединиться к группе</h1>
-                <Input type='text' placeholder='Код группы' value={groupCode} onChange={handleGroupCodeChange}/>
-                {error && <p className='text-red-500 text-sm text-center w-full'>{error}</p>}
-                <Button onClick={joinGroup} className='cursor-pointer'>{isJoining ? <Spinner color=''/> : 'Присоединиться'}</Button> 
+        <div className="min-h-screen w-full montserrat-600 flex justify-center items-center flex-col px-4 py-8">
+            <div className="w-full max-w-md p-5 md:p-6 flex flex-col gap-4 md:gap-5 items-center justify-center rounded-lg border-2 border-gray-300 overflow-hidden">
+                <h1 className='text-xl md:text-2xl font-bold text-center'>Присоединиться к группе</h1>
+                <Input type='text' placeholder='Код группы' value={groupCode} onChange={handleGroupCodeChange} className='w-full'/>
+                {error && <p className='text-red-500 text-xs md:text-sm text-center w-full break-words px-2'>{error}</p>}
+                <Button onClick={joinGroup} className='cursor-pointer w-full md:w-auto px-6 py-3 text-base md:text-base'>{isJoining ? <Spinner color=''/> : 'Присоединиться'}</Button> 
                 <Link className='text-sm text-gray-500' to='/'>Позже</Link>
             </div>
         </div>

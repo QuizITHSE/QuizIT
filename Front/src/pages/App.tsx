@@ -652,9 +652,9 @@ function App() {
             
             {/* Manual Join Option */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
                 <div className="flex items-center">
-                  <div className="bg-blue-100 p-3 rounded-full mr-4">
+                  <div className="bg-blue-100 p-3 rounded-full mr-4 flex-shrink-0">
                     <Users className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
@@ -667,7 +667,7 @@ function App() {
                 <Button
                   onClick={() => navigate('/play')}
                   variant="outline"
-                  className="px-6 py-3 text-lg cursor-pointer"
+                  className="w-full md:w-auto px-6 py-3 text-lg cursor-pointer"
                 >
                   <Users className="h-5 w-5 mr-2" />
                   Ввести код
@@ -677,9 +677,9 @@ function App() {
             
             {/* My Results Option */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
                 <div className="flex items-center">
-                  <div className="bg-purple-100 p-3 rounded-full mr-4">
+                  <div className="bg-purple-100 p-3 rounded-full mr-4 flex-shrink-0">
                     <TrendingUp className="h-6 w-6 text-purple-600" />
                   </div>
                   <div>
@@ -692,7 +692,7 @@ function App() {
                 <Button
                   onClick={() => navigate('/my-results')}
                   variant="outline"
-                  className="px-6 py-3 text-lg cursor-pointer"
+                  className="w-full md:w-auto px-6 py-3 text-lg cursor-pointer"
                 >
                   <TrendingUp className="h-5 w-5 mr-2" />
                   Посмотреть

@@ -634,7 +634,7 @@ const CreateQuiz = () => {
                         </div>
                         )}
                         <textarea
-                                className='w-full bg-white rounded-2xl p-2 placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none ml-2'
+                                className='w-full bg-white rounded-2xl p-2 placeholder-gray-500 focus:border-none focus:outline-none drop-shadow-none'
                                 placeholder='пояснение к правильному ответу'
                                 value={quiz[index]?.explanation || ""}
                                 onChange={(e) => updateExplanation(e.target.value)}

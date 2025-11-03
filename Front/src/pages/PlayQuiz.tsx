@@ -362,12 +362,12 @@ const PlayQuiz: React.FC = () => {
 
   if (!gameCodeParam && !gameCode) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 px-4 py-8">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 md:p-8">
           <div className="text-center">
-            <GraduationCap className="h-16 w-16 text-blue-600 mx-auto mb-6" />
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Присоединиться к квизу</h1>
-            <p className="text-gray-600 mb-8">Введите код игры, который дал вам учитель</p>
+            <GraduationCap className="h-12 w-12 md:h-16 md:w-16 text-blue-600 mx-auto mb-4 md:mb-6" />
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">Присоединиться к квизу</h1>
+            <p className="text-sm md:text-base text-gray-600 mb-6 md:mb-8">Введите код игры, который дал вам учитель</p>
             
             <div className="space-y-4">
               <div>
@@ -380,7 +380,7 @@ const PlayQuiz: React.FC = () => {
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
                   placeholder="Введите код игры"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg font-mono tracking-wider"
+                  className="w-full px-4 py-3 md:py-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-base md:text-lg font-mono tracking-wider"
                   maxLength={6}
                 />
               </div>
@@ -388,16 +388,16 @@ const PlayQuiz: React.FC = () => {
               <Button
                 onClick={handleCodeSubmit}
                 disabled={!codeInput.trim()}
-                className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 text-lg cursor-pointer"
+                className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-4 md:py-3 text-base md:text-lg cursor-pointer"
               >
-                <Play className="h-5 w-5 mr-2" />
+                <Play className="h-4 w-4 md:h-5 md:w-5 mr-2" />
                 Присоединиться к игре
               </Button>
               
               <Button
                 onClick={() => navigate('/')}
                 variant="outline"
-                className="w-full cursor-pointer"
+                className="w-full cursor-pointer text-base md:text-base"
               >
                 На главную
               </Button>
@@ -441,26 +441,26 @@ const PlayQuiz: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full montserrat-600 bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 w-full">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-4 md:mb-6 overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
             <div className="flex items-center">
-              <GraduationCap className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Участие в квизе</h1>
-                <p className="text-gray-600">Игрок: {playerName}</p>
+              <GraduationCap className="h-8 w-8 md:h-8 md:w-8 text-blue-600 mr-3 md:mr-3 flex-shrink-0" />
+              <div className="flex-1">
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Участие в квизе</h1>
+                <p className="text-base md:text-base text-gray-600">Игрок: {playerName}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:gap-4 w-full md:w-auto">
               {(gameCode || gameCodeParam) && (
-                <div className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-mono">
-                  <span className="mr-2">Код:</span>
+                <div className="flex items-center bg-blue-100 text-blue-800 px-3 md:px-3 py-1.5 md:py-1 rounded-full text-sm md:text-sm font-mono w-full md:w-auto justify-center md:justify-start">
+                  <span className="mr-2 md:mr-2">Код:</span>
                   <span className="font-bold">{gameCode || gameCodeParam}</span>
                 </div>
               )}
               {gameMode !== 'normal' && (
-                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                <div className={`flex items-center px-3 md:px-3 py-1.5 md:py-1 rounded-full text-sm md:text-sm font-semibold w-full md:w-auto justify-center md:justify-start ${
                   gameMode === 'lockdown' 
                     ? 'bg-red-100 text-red-800' 
                     : 'bg-yellow-100 text-yellow-800'
@@ -468,12 +468,12 @@ const PlayQuiz: React.FC = () => {
                   {gameMode === 'lockdown' ? '🔒 Режим блокировки' : '👁️ Отслеживание вкладок'}
                 </div>
               )}
-              <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
+              <div className={`flex items-center px-3 md:px-3 py-1.5 md:py-1 rounded-full text-sm md:text-sm w-full md:w-auto justify-center md:justify-start ${
                 wsConnected 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-red-100 text-red-800'
               }`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
+                <div className={`w-2.5 h-2.5 md:w-2 md:h-2 rounded-full mr-2 md:mr-2 flex-shrink-0 ${
                   wsConnected ? 'bg-green-500' : 'bg-red-500'
                 }`}></div>
                 {wsConnected ? 'Подключено' : 'Отключено'}
@@ -481,7 +481,7 @@ const PlayQuiz: React.FC = () => {
               <Button
                 onClick={() => navigate('/')}
                 variant="outline"
-                className="cursor-pointer"
+                className="cursor-pointer text-sm md:text-sm w-full md:w-auto"
               >
                 Выйти
               </Button>
@@ -490,7 +490,7 @@ const PlayQuiz: React.FC = () => {
         </div>
 
         {/* Main content */}
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <div className="bg-white rounded-lg shadow-md p-4 md:p-8 text-center">
           {gameFinished ? (
             /* Game Finished Display */
             <div className={`p-8 rounded-lg ${
@@ -659,21 +659,21 @@ const PlayQuiz: React.FC = () => {
           ) : (
             /* Waiting Screen */
             <div>
-              <div className="mb-6">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Ожидание начала квиза</h2>
-                <p className="text-gray-600 mb-6">
+              <div className="mb-4 md:mb-6">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 md:mb-4">Ожидание начала квиза</h2>
+                <p className="text-base md:text-lg text-gray-600 mb-4 md:mb-6">
                   Вы присоединились к игре с кодом: <span className="font-mono font-bold text-blue-600">{gameCode || gameCodeParam}</span>
                 </p>
               </div>
               
               <div className="space-y-4 mb-8">
                 <div className="flex items-center justify-center text-gray-600">
-                  <Users className="h-5 w-5 mr-2" />
-                  <span>Игрок: {playerName}</span>
+                  <Users className="h-6 w-6 md:h-5 md:w-5 mr-2 flex-shrink-0" />
+                  <span className="text-base md:text-base text-center">Игрок: {playerName}</span>
                 </div>
               </div>
 
-              <div className="text-sm text-gray-500">
+              <div className="text-sm md:text-sm text-gray-500 space-y-2">
                 <p>Статус подключения: {wsConnected ? '✅ Подключено' : '❌ Отключено'}</p>
                 <p>Аутентификация: {authSent ? (authSuccess ? '✅ Успешна' : '⏳ Ожидание ответа') : '❌ Не отправлена'}</p>
                 <p>Присоединение к игре: {gameJoined ? '✅ Присоединен' : (authSuccess ? '⏳ Готово к присоединению' : '❌ Ожидание аутентификации')}</p>
