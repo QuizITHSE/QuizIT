@@ -630,27 +630,27 @@ function App() {
                     </div>
                     <div className="flex-1">
                       <h2 className="text-xl font-bold text-gray-900">Последняя игра</h2>
-                      <div className="flex flex-wrap items-center gap-3 mt-2">
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600">Код: </span>
-                          <span className="text-sm font-mono font-bold text-blue-600 ml-1">{lastGameResult.gameCode}</span>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-2">
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-600">Код:</span>
+                          <span className="text-sm font-mono font-bold text-blue-600">{lastGameResult.gameCode}</span>
                         </div>
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600">Место: </span>
-                          <span className="text-sm font-bold text-gray-900 ml-1">
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-600">Место:</span>
+                          <span className="text-sm font-bold text-gray-900">
                             {lastGameResult.placement === 1 ? '🥇 1' :
                              lastGameResult.placement === 2 ? '🥈 2' :
                              lastGameResult.placement === 3 ? '🥉 3' :
                              `#${lastGameResult.placement}`}
                           </span>
                         </div>
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600">Баллы: </span>
-                          <span className="text-sm font-bold text-blue-600 ml-1">{lastGameResult.score}/{lastGameResult.total_questions}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-600">Баллы:</span>
+                          <span className="text-sm font-bold text-blue-600">{lastGameResult.score}/{lastGameResult.total_questions}</span>
                         </div>
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600">Правильных: </span>
-                          <span className="text-sm font-bold text-green-600 ml-1">{lastGameResult.correct_answers}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-600">Правильных:</span>
+                          <span className="text-sm font-bold text-green-600">{lastGameResult.correct_answers}</span>
                         </div>
                       </div>
                     </div>
@@ -685,28 +685,32 @@ function App() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {studentHomework.map((homework) => (
                     <div key={homework.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex flex-row items-start justify-between gap-3 mb-3">
                         <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 text-lg mb-1">
-                            {homework.quiz_title}
-                          </h3>
-                          <div className="flex items-center text-sm text-gray-500 mb-2">
-                            {getModeIcon(homework.mode)}
-                            <span className="ml-1">{getModeLabel(homework.mode)}</span>
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-semibold text-gray-900 text-lg flex-1">
+                              {homework.quiz_title}
+                            </h3>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ml-3 ${getStatusColor(homework.status)}`}>
+                              {homework.status}
+                            </span>
+                          </div>
+                          <div className="flex flex-row flex-wrap items-center gap-2 md:gap-4 text-sm text-gray-500 mb-2">
+                            <div className="flex items-center">
+                              {getModeIcon(homework.mode)}
+                              <span className="ml-1">{getModeLabel(homework.mode)}</span>
+                            </div>
                             {homework.time_limit_minutes && (
-                              <>
-                                <Clock className="h-3 w-3 ml-2" />
+                              <div className="flex items-center">
+                                <Clock className="h-3 w-3" />
                                 <span className="ml-1">{homework.time_limit_minutes} мин</span>
-                              </>
+                              </div>
                             )}
                           </div>
                           <p className="text-sm text-gray-600 mb-2">
                             Группа: {homework.group_name}
                           </p>
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(homework.status)}`}>
-                          {homework.status}
-                        </span>
                       </div>
                       
                       <div className="space-y-2 mb-4">

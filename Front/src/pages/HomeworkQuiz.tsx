@@ -692,9 +692,9 @@ const HomeworkQuiz: React.FC = () => {
               {/* Mode Warning and Tab Tracking */}
               {state.homework.mode === 'lockdown' && (
                 <div className="mb-4 p-3 rounded-lg border-2 bg-orange-50 border-orange-300">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-row items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-orange-600" />
+                      <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0" />
                       <span className="text-sm font-medium text-gray-900">
                         🔒 Полноэкранный режим блокировки
                       </span>
@@ -707,9 +707,9 @@ const HomeworkQuiz: React.FC = () => {
               )}
               {state.homework.mode === 'tab_tracking' && (
                 <div className="mb-4 p-3 rounded-lg border-2 bg-blue-50 border-blue-300">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-row flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-blue-600" />
+                      <AlertTriangle className="h-5 w-5 text-blue-600 flex-shrink-0" />
                       <span className="text-sm font-medium text-gray-900">
                         👁️ Отслеживание вкладок активно
                       </span>

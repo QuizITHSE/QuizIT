@@ -558,15 +558,15 @@ const PlayQuiz: React.FC = () => {
                 <p className="text-base md:text-base text-gray-600">Игрок: {playerName}</p>
               </div>
             </div>
-            <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:gap-4 w-full md:w-auto">
+            <div className="flex flex-row flex-wrap items-center gap-2 md:gap-4 w-full">
               {(gameCode || gameCodeParam) && (
-                <div className="flex items-center bg-blue-100 text-blue-800 px-3 md:px-3 py-1.5 md:py-1 rounded-full text-sm md:text-sm font-mono w-full md:w-auto justify-center md:justify-start">
-                  <span className="mr-2 md:mr-2">Код:</span>
-                  <span className="font-bold">{gameCode || gameCodeParam}</span>
+                <div className="flex items-center bg-blue-100 text-blue-800 px-3 py-1.5 rounded-full text-sm font-mono">
+                  <span className="mr-2">Код:</span>
+                  <span className="font-bold break-all">{gameCode || gameCodeParam}</span>
                 </div>
               )}
               {gameMode !== 'normal' && (
-                <div className={`flex items-center px-3 md:px-3 py-1.5 md:py-1 rounded-full text-sm md:text-sm font-semibold w-full md:w-auto justify-center md:justify-start ${
+                <div className={`flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${
                   gameMode === 'lockdown' 
                     ? 'bg-red-100 text-red-800' 
                     : 'bg-yellow-100 text-yellow-800'
@@ -574,12 +574,12 @@ const PlayQuiz: React.FC = () => {
                   {gameMode === 'lockdown' ? '🔒 Режим блокировки' : '👁️ Отслеживание вкладок'}
                 </div>
               )}
-              <div className={`flex items-center px-3 md:px-3 py-1.5 md:py-1 rounded-full text-sm md:text-sm w-full md:w-auto justify-center md:justify-start ${
+              <div className={`flex items-center px-3 py-1.5 rounded-full text-sm ${
                 wsConnected 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-red-100 text-red-800'
               }`}>
-                <div className={`w-2.5 h-2.5 md:w-2 md:h-2 rounded-full mr-2 md:mr-2 flex-shrink-0 ${
+                <div className={`w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0 ${
                   wsConnected ? 'bg-green-500' : 'bg-red-500'
                 }`}></div>
                 {wsConnected ? 'Подключено' : 'Отключено'}
@@ -587,7 +587,7 @@ const PlayQuiz: React.FC = () => {
               <Button
                 onClick={() => navigate('/')}
                 variant="outline"
-                className="cursor-pointer text-sm md:text-sm w-full md:w-auto"
+                className="cursor-pointer text-sm"
               >
                 Выйти
               </Button>
