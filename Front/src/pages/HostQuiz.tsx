@@ -5,6 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, Users, Clock, Play, Pause, Square } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import QuizContent from '@/components/QuizContent';
 import RoundResults from '@/components/RoundResults';
 import GameResults from '@/components/GameResults';
@@ -446,15 +447,36 @@ const HostQuiz: React.FC = () => {
               {/* Game Code Display */}
               {gameCode ? (
                 <div className="mb-4 md:mb-6 px-2">
-                  <p className="text-base md:text-lg font-semibold text-gray-700 mb-2">Код для подключения игроков:</p>
-                  <div className="bg-blue-100 text-blue-800 px-4 md:px-6 py-3 md:py-4 rounded-lg text-xl md:text-2xl font-mono font-bold inline-block break-all max-w-full">
-                    {gameCode}
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8">
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center">
+                      <p className="text-base md:text-lg font-semibold text-gray-700 mb-3">QR-код для присоединения:</p>
+                      <div className="bg-white p-3 rounded-lg shadow-md">
+                        <QRCodeSVG 
+                          value={`${window.location.origin}/play?code=${gameCode}`} 
+                          width={200} 
+                          height={200}
+                          level="M"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2 text-center max-w-[200px]">
+                        Отсканируйте для быстрого присоединения
+                      </p>
+                    </div>
+                    
+                    {/* Code Display */}
+                    <div className="flex flex-col items-center md:items-start">
+                      <p className="text-base md:text-lg font-semibold text-gray-700 mb-2">Или введите код вручную:</p>
+                      <div className="bg-blue-100 text-blue-800 px-4 md:px-6 py-3 md:py-4 rounded-lg text-xl md:text-2xl font-mono font-bold inline-block break-all max-w-full">
+                        {gameCode}
+                      </div>
+                      <p className="text-xs md:text-sm text-gray-500 mt-2">Поделитесь этим кодом с игроками</p>
+                    </div>
                   </div>
-                  <p className="text-xs md:text-sm text-gray-500 mt-2">Поделитесь этим кодом с игроками</p>
                   
                   {players.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-base md:text-lg font-semibold text-gray-700 mb-2">Подключенные игроки:</p>
+                    <div className="mt-6">
+                      <p className="text-base md:text-lg font-semibold text-gray-700 mb-2 text-center">Подключенные игроки:</p>
                       <div className="flex flex-wrap gap-2 justify-center">
                         {players.map((player, index) => (
                           <span key={index} className="bg-green-100 text-green-800 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm break-words max-w-full">
