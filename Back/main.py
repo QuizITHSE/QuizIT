@@ -653,7 +653,8 @@ async def main_handler(websocket: WebSocket):
                         "message": "Joined! Waiting for start", 
                         "game_settings": {
                             "mode": target_lobby.game_type.get("mode", "normal"),
-                            "disable_copy": target_lobby.game_type.get("disable_copy", False)
+                            "disable_copy": target_lobby.game_type.get("disable_copy", False),
+                            "shuffle_answers": target_lobby.game_type.get("shuffle_answers", False)
                         }
                     }))
                     print(target_lobby.quiz["title"])

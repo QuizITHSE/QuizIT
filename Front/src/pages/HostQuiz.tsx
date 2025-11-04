@@ -86,6 +86,7 @@ const HostQuiz: React.FC = () => {
   const groupId = searchParams.get('group');
   const gameMode = searchParams.get('gameMode') || 'normal';
   const disableCopy = searchParams.get('disableCopy') === 'true';
+  const shuffleAnswers = searchParams.get('shuffleAnswers') === 'true';
 
   useEffect(() => {
     const websocket = new WebSocket('wss://thatisdreamer-quiz-it-back-1e40.twc1.net/ws');
@@ -228,13 +229,14 @@ const HostQuiz: React.FC = () => {
         group: groupId, 
         game_type: {
           mode: gameMode,
-          disable_copy: disableCopy
+          disable_copy: disableCopy,
+          shuffle_answers: shuffleAnswers
         }
       };
       ws.send(JSON.stringify(createQuizMessage));
       setQuizCreated(true);
     }
-  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated, gameMode, disableCopy]);
+  }, [wsConnected, ws, quiz, quizId, groupId, authSuccess, quizCreated, gameMode, disableCopy, shuffleAnswers]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;

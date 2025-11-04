@@ -16,12 +16,61 @@ interface QuizContentProps {
   onSubmitAnswer: (answer: number[] | string) => void;
   isHost?: boolean;
   disableCopy?: boolean;
+  shuffleAnswers?: boolean;
 }
 
-const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSubmitAnswer, isHost = false, disableCopy = false }) => {
+const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSubmitAnswer, isHost = false, disableCopy = false, shuffleAnswers = false }) => {
   const { question, type, options, points } = questionData;
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
   const [textAnswer, setTextAnswer] = useState<string>('');
+  
+  // Shuffle options and create mapping if shuffleAnswers is enabled
+  const [shuffledOptions, setShuffledOptions] = useState<{option: string, originalIndex: number}[]>([]);
+  const [shuffleMapping, setShuffleMapping] = useState<number[]>([]);
+  
+  useEffect(() => {
+    if (shuffleAnswers && !isHost && options && Array.isArray(options) && type !== 'text') {
+      // Create array of indices
+      const indices = options.map((_, index) => index);
+      
+      // Fisher-Yates shuffle algorithm
+      const shuffled = [...indices];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      
+      // Create mapping: shuffledIndex -> originalIndex
+      const mapping: number[] = new Array(shuffled.length);
+      shuffled.forEach((originalIndex, shuffledIndex) => {
+        mapping[shuffledIndex] = originalIndex;
+      });
+      
+      // Create shuffled options array
+      const shuffledOpts = shuffled.map(originalIndex => ({
+        option: options[originalIndex],
+        originalIndex: originalIndex
+      }));
+      
+      setShuffledOptions(shuffledOpts);
+      setShuffleMapping(mapping);
+      setSelectedAnswers([]); // Reset selections when question changes
+      setTextAnswer(''); // Reset text answer when question changes
+    } else {
+      // No shuffling - use original order
+      if (options && Array.isArray(options)) {
+        const originalOpts = options.map((opt, index) => ({
+          option: opt,
+          originalIndex: index
+        }));
+        setShuffledOptions(originalOpts);
+        const identityMapping = options.map((_, index) => index);
+        setShuffleMapping(identityMapping);
+        setSelectedAnswers([]); // Reset selections when question changes
+        setTextAnswer(''); // Reset text answer when question changes
+      }
+    }
+  }, [questionData.question, shuffleAnswers, isHost, options, type]);
 
   // Block text copying when disableCopy is enabled
   useEffect(() => {
@@ -66,17 +115,17 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
     }
   }, [disableCopy, isHost]);
 
-  const handleAnswerSelect = (index: number) => {
+  const handleAnswerSelect = (shuffledIndex: number) => {
     if (type === 'multiple') {
-      // Multiple selection - toggle answer
+      // Multiple selection - toggle answer by shuffled index
       setSelectedAnswers(prev => 
-        prev.includes(index) 
-          ? prev.filter(i => i !== index)
-          : [...prev, index]
+        prev.includes(shuffledIndex) 
+          ? prev.filter(i => i !== shuffledIndex)
+          : [...prev, shuffledIndex]
       );
     } else {
-      // Single selection - replace answer
-      setSelectedAnswers([index]);
+      // Single selection - replace answer by shuffled index
+      setSelectedAnswers([shuffledIndex]);
     }
   };
 
@@ -87,7 +136,9 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
       }
     } else {
       if (selectedAnswers.length > 0) {
-        onSubmitAnswer(selectedAnswers);
+        // Convert shuffled indices back to original indices for submission
+        const originalIndices = selectedAnswers.map(shuffledIdx => shuffleMapping[shuffledIdx]);
+        onSubmitAnswer(type === 'multiple' ? originalIndices : originalIndices[0]);
       }
     }
   };
@@ -138,7 +189,44 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
         {/* Options for single/multiple choice questions */}
         {type !== 'text' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-2 mb-6 md:mb-8">
-          {options && Array.isArray(options) ? options.map((option, index) => {
+          {shuffledOptions.length > 0 ? shuffledOptions.map((item, shuffledIndex) => {
+            const colorMap = ['#540D6E', '#EE4266', '#FFD23F', '#3BCEAC'];
+            const icons = ['star.svg', 'sq.svg', 'trig.svg', 'circ.svg'];
+            // Use shuffled index for color/icon mapping so labels change with position
+            const bgColor = colorMap[shuffledIndex] || '#540D6E';
+            const icon = icons[shuffledIndex] || 'star.svg';
+            const isSelected = selectedAnswers.includes(shuffledIndex);
+            
+            return (
+              <button
+                key={shuffledIndex}
+                onClick={() => !isHost && handleAnswerSelect(shuffledIndex)}
+                disabled={isHost}
+                className={`rounded-lg p-4 md:p-4 text-white min-h-[100px] md:min-h-[80px] flex items-center drop-shadow-none transition-all duration-300 ${
+                  isHost ? 'bg-gray-300 cursor-default' : 'cursor-pointer'
+                } ${isSelected ? 'transform scale-105' : ''}`}
+                style={{
+                  backgroundColor: item.option ? bgColor : (isHost ? '#d1d5db' : bgColor)
+                }}
+              >
+                <img src={icon} alt="icon" className='w-10 h-10 md:w-8 md:h-8 flex-shrink-0'/>
+                <span className="text-base md:text-sm font-medium ml-3 md:ml-2 flex-1 text-left overflow-hidden text-ellipsis text-white">
+                  {item.option || `Вариант ${shuffledIndex + 1}`}
+                </span>
+                <div className={`ml-3 md:ml-2 w-10 h-10 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                  isSelected
+                    ? 'bg-green-500 border-green-500'
+                    : 'bg-transparent border-white opacity-50'
+                }`}>
+                  {isSelected && (
+                    <svg className="w-5 h-5 md:w-4 md:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            );
+          }) : options && Array.isArray(options) ? options.map((option, index) => {
             const colorMap = ['#540D6E', '#EE4266', '#FFD23F', '#3BCEAC'];
             const icons = ['star.svg', 'sq.svg', 'trig.svg', 'circ.svg'];
             const bgColor = colorMap[index] || '#540D6E';
@@ -195,7 +283,7 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
             {type === 'text' 
               ? (textAnswer.trim() ? 'Отправить ответ' : 'Введите ответ')
               : (selectedAnswers.length > 0 
-                ? `Отправить ответ${selectedAnswers.length > 1 ? 'ы' : ''} (${selectedAnswers.map(i => i + 1).join(', ')})`
+                ? `Отправить ответ${selectedAnswers.length > 1 ? 'ы' : ''}`
                 : 'Выберите ответ')
             }
           </button>

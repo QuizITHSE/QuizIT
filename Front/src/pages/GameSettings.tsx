@@ -25,6 +25,7 @@ const GameSettings: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [gameMode, setGameMode] = useState<GameMode>('normal');
   const [disableCopy, setDisableCopy] = useState<boolean>(false);
+  const [shuffleAnswers, setShuffleAnswers] = useState<boolean>(false);
   
   const quizId = searchParams.get('id');
 
@@ -117,7 +118,7 @@ const GameSettings: React.FC = () => {
       return;
     }
     
-    navigate(`/host?id=${quizId}&group=${selectedGroup}&gameMode=${gameMode}&disableCopy=${disableCopy}`);
+    navigate(`/host?id=${quizId}&group=${selectedGroup}&gameMode=${gameMode}&disableCopy=${disableCopy}&shuffleAnswers=${shuffleAnswers}`);
   };
 
   const handleBack = () => {
@@ -402,6 +403,52 @@ const GameSettings: React.FC = () => {
                       <h4 className="font-semibold text-gray-900">Блокировка копирования</h4>
                       <p className="text-sm text-gray-600 mt-1">
                         Предотвращает копирование текста вопросов
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Shuffle Answers Option */}
+            {groups.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div 
+                  onClick={() => setShuffleAnswers(!shuffleAnswers)}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    shuffleAnswers
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+                        shuffleAnswers
+                          ? 'border-blue-600 bg-blue-600'
+                          : 'border-gray-300'
+                      }`}
+                    >
+                      {shuffleAnswers && (
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">Перемешивание вариантов ответов</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Варианты ответов будут случайным образом перемешаны для каждого игрока
                       </p>
                     </div>
                   </div>

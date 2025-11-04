@@ -49,6 +49,7 @@ const PlayQuiz: React.FC = () => {
   const [userUid, setUserUid] = useState<string | null>(null);
   const [gameMode, setGameMode] = useState<'normal' | 'lockdown' | 'tab_tracking'>('normal');
   const [disableCopy, setDisableCopy] = useState<boolean>(false);
+  const [shuffleAnswers, setShuffleAnswers] = useState<boolean>(false);
   const [isKicked, setIsKicked] = useState(false);
   const [kickReason, setKickReason] = useState<string>('');
 
@@ -92,6 +93,9 @@ const PlayQuiz: React.FC = () => {
             }
             if (message.game_settings?.disable_copy !== undefined) {
               setDisableCopy(message.game_settings.disable_copy);
+            }
+            if (message.game_settings?.shuffle_answers !== undefined) {
+              setShuffleAnswers(message.game_settings.shuffle_answers);
             }
             break;
             
@@ -417,7 +421,7 @@ const PlayQuiz: React.FC = () => {
         setFinishedGameId(gamesSnapshot.docs[0].id);
       }
     } catch (error) {
-      // Error finding gameId, button won't show
+    
     }
   };
 
@@ -779,6 +783,7 @@ const PlayQuiz: React.FC = () => {
               timeLeft={timeLeft} 
               onSubmitAnswer={submitAnswer}
               disableCopy={disableCopy}
+              shuffleAnswers={shuffleAnswers}
             />
           ) : (
             /* Waiting Screen */
