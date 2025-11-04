@@ -675,7 +675,7 @@ function App() {
                     <FileText className="h-6 w-6 text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Мои домашниения</h2>
+                    <h2 className="text-xl font-bold text-gray-900">Мои ДЗ</h2>
                     <p className="text-gray-600">
                       Задания, которые нужно выполнить
                     </p>
