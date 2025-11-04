@@ -205,7 +205,24 @@ class Lobby:
             is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
         else:
             correct_answer = current_q["correct"]
-            is_correct = answer == correct_answer
+            # Normalize types for comparison - convert both to same type
+            # Handle both single answer (int) and multiple answer (list)
+            if isinstance(answer, list):
+                # For multiple choice, compare lists
+                if isinstance(correct_answer, list):
+                    is_correct = sorted(answer) == sorted(correct_answer)
+                else:
+                    is_correct = False
+            else:
+                # For single choice, ensure both are same type (int)
+                # Convert answer to int if it's a string representation of a number
+                try:
+                    answer_int = int(answer) if not isinstance(answer, int) else answer
+                    correct_int = int(correct_answer) if not isinstance(correct_answer, int) else correct_answer
+                    is_correct = answer_int == correct_int
+                except (ValueError, TypeError):
+                    # Fallback to direct comparison if conversion fails
+                    is_correct = answer == correct_answer
             
         question_points = current_q.get("point", 1)
         points_earned = question_points if is_correct else 0
@@ -279,7 +296,19 @@ class Lobby:
             if question_type == "text":
                 is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
             else:
-                is_correct = answer == correct_answer
+                # Normalize types for comparison - same logic as save_answer
+                if isinstance(answer, list):
+                    if isinstance(correct_answer, list):
+                        is_correct = sorted(answer) == sorted(correct_answer)
+                    else:
+                        is_correct = False
+                else:
+                    try:
+                        answer_int = int(answer) if not isinstance(answer, int) else answer
+                        correct_int = int(correct_answer) if not isinstance(correct_answer, int) else correct_answer
+                        is_correct = answer_int == correct_int
+                    except (ValueError, TypeError):
+                        is_correct = answer == correct_answer
                 
             if is_correct:
                 info_for_host["right"] += 1
@@ -304,7 +333,19 @@ class Lobby:
             if question_type == "text":
                 is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
             else:
-                is_correct = answer == correct_answer
+                # Normalize types for comparison - same logic as save_answer
+                if isinstance(answer, list):
+                    if isinstance(correct_answer, list):
+                        is_correct = sorted(answer) == sorted(correct_answer)
+                    else:
+                        is_correct = False
+                else:
+                    try:
+                        answer_int = int(answer) if not isinstance(answer, int) else answer
+                        correct_int = int(correct_answer) if not isinstance(correct_answer, int) else correct_answer
+                        is_correct = answer_int == correct_int
+                    except (ValueError, TypeError):
+                        is_correct = answer == correct_answer
             answered_user_ids.add(answer_info["user"].user_id)
             
             await answer_info["user"].ws_id.send_text(json.dumps({

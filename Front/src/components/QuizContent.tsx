@@ -29,36 +29,34 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
   const [shuffleMapping, setShuffleMapping] = useState<number[]>([]);
   
   useEffect(() => {
-    if (shuffleAnswers && !isHost && options && Array.isArray(options) && type !== 'text') {
-      // Create array of indices
-      const indices = options.map((_, index) => index);
-      
-      // Fisher-Yates shuffle algorithm
-      const shuffled = [...indices];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      
-      // Create mapping: shuffledIndex -> originalIndex
-      const mapping: number[] = new Array(shuffled.length);
-      shuffled.forEach((originalIndex, shuffledIndex) => {
-        mapping[shuffledIndex] = originalIndex;
-      });
-      
-      // Create shuffled options array
-      const shuffledOpts = shuffled.map(originalIndex => ({
-        option: options[originalIndex],
-        originalIndex: originalIndex
-      }));
-      
-      setShuffledOptions(shuffledOpts);
-      setShuffleMapping(mapping);
-      setSelectedAnswers([]); // Reset selections when question changes
-      setTextAnswer(''); // Reset text answer when question changes
-    } else {
-      // No shuffling - use original order
-      if (options && Array.isArray(options)) {
+    if (options && Array.isArray(options) && type !== 'text') {
+      if (shuffleAnswers && !isHost && options.length > 0) {
+        // Create array of indices
+        const indices = options.map((_, index) => index);
+        
+        // Fisher-Yates shuffle algorithm
+        const shuffled = [...indices];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        
+        // Create mapping: shuffledIndex -> originalIndex
+        const mapping: number[] = new Array(shuffled.length);
+        shuffled.forEach((originalIndex, shuffledIndex) => {
+          mapping[shuffledIndex] = originalIndex;
+        });
+        
+        // Create shuffled options array
+        const shuffledOpts = shuffled.map(originalIndex => ({
+          option: options[originalIndex],
+          originalIndex: originalIndex
+        }));
+        
+        setShuffledOptions(shuffledOpts);
+        setShuffleMapping(mapping);
+      } else {
+        // No shuffling - use original order
         const originalOpts = options.map((opt, index) => ({
           option: opt,
           originalIndex: index
@@ -66,9 +64,16 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
         setShuffledOptions(originalOpts);
         const identityMapping = options.map((_, index) => index);
         setShuffleMapping(identityMapping);
-        setSelectedAnswers([]); // Reset selections when question changes
-        setTextAnswer(''); // Reset text answer when question changes
       }
+      // Reset selections and text answer when question changes
+      setSelectedAnswers([]);
+      setTextAnswer('');
+    } else {
+      // For text questions or when options are not available
+      setShuffledOptions([]);
+      setShuffleMapping([]);
+      setSelectedAnswers([]);
+      setTextAnswer('');
     }
   }, [questionData.question, shuffleAnswers, isHost, options, type]);
 
@@ -135,10 +140,33 @@ const QuizContent: React.FC<QuizContentProps> = ({ questionData, timeLeft, onSub
         onSubmitAnswer(textAnswer.trim());
       }
     } else {
-      if (selectedAnswers.length > 0) {
+      if (selectedAnswers.length > 0 && shuffleMapping.length > 0) {
         // Convert shuffled indices back to original indices for submission
-        const originalIndices = selectedAnswers.map(shuffledIdx => shuffleMapping[shuffledIdx]);
-        onSubmitAnswer(type === 'multiple' ? originalIndices : originalIndices[0]);
+        const originalIndices = selectedAnswers.map(shuffledIdx => {
+          // Ensure shuffledIdx is valid
+          if (shuffledIdx >= 0 && shuffledIdx < shuffleMapping.length) {
+            return shuffleMapping[shuffledIdx];
+          }
+          return shuffledIdx; // Fallback if mapping is invalid
+        });
+        
+        // For single choice, send as number; for multiple, send as array
+        if (type === 'multiple') {
+          onSubmitAnswer(originalIndices);
+        } else {
+          // Ensure we send a number for single choice
+          const originalIndex = originalIndices[0];
+          if (typeof originalIndex === 'number') {
+            onSubmitAnswer(originalIndex);
+          }
+        }
+      } else if (selectedAnswers.length > 0 && shuffleMapping.length === 0) {
+        // Fallback: if shuffleMapping is not initialized, use selectedAnswers directly
+        if (type === 'multiple') {
+          onSubmitAnswer(selectedAnswers);
+        } else {
+          onSubmitAnswer(selectedAnswers[0]);
+        }
       }
     }
   };
