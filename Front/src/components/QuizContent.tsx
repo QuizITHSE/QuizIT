@@ -13,7 +13,7 @@ interface QuestionData {
 interface QuizContentProps {
   questionData: QuestionData;
   timeLeft: number;
-  onSubmitAnswer: (answer: number[] | string) => void;
+  onSubmitAnswer: (answer: number | number[] | string) => void;
   isHost?: boolean;
   disableCopy?: boolean;
   shuffleAnswers?: boolean;

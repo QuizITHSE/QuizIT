@@ -445,7 +445,7 @@ const PlayQuiz: React.FC = () => {
     setFinishedGameId(null);
   };
 
-  const submitAnswer = (answer: number[] | string) => {
+  const submitAnswer = (answer: number | number[] | string) => {
     if (ws && currentQuestion) {
       const answerMessage = { 
         answer: answer
