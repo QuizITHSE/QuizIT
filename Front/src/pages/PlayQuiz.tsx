@@ -810,25 +810,7 @@ const PlayQuiz: React.FC = () => {
                 <p>WebSocket: {ws?.readyState === WebSocket.OPEN ? '✅ Открыто' : ws?.readyState === WebSocket.CONNECTING ? '⏳ Подключение' : '❌ Закрыто'}</p>
               </div>
               
-              {/* Test button for development */}
-              {(gameMode === 'tab_tracking' || gameMode === 'lockdown') && gameJoined && (
-                <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800 mb-2 font-semibold">🧪 Режим отладки</p>
-                  <Button
-                    onClick={() => {
-                      reportCheating();
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer bg-white hover:bg-yellow-100 text-yellow-800 border-yellow-300"
-                  >
-                    Тест: Отправить отчет
-                  </Button>
-                  <p className="text-xs text-yellow-700 mt-2">
-                    Откройте консоль браузера (F12) для просмотра логов отправки
-                  </p>
-                </div>
-              )}
+              
             </div>
           )}
         </div>
